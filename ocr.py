@@ -9,6 +9,7 @@ import numpy as np
 from six.moves import xrange as range
 from python_speech_features import mfcc
 from utils import sparse_tuple_from as sparse_tuple_from
+
 # A|MOVE|to|stop|Mr.|Gaitskell|from
 
 SPACE_TOKEN = '<space>'
@@ -36,6 +37,7 @@ trainLableFn='./dataset/LDC93S1.txt'
 fs, audio = wav.read(trainInputFn)
 inputs = mfcc(audio, samplerate=fs)
 # Tranform in 3D array
+# dataset processing!
 train_inputs = np.asarray(inputs[np.newaxis, :])
 train_inputs = (train_inputs - np.mean(train_inputs))/np.std(train_inputs)
 train_seq_len = [train_inputs.shape[1]]
@@ -54,8 +56,7 @@ val_inputs, val_targets, val_seq_len = train_inputs, train_targets, train_seq_le
 
 graph = tf.Graph()
 with graph.as_default():
-    inputs = tf.placeholder(tf.float32, [None, None, num_features])
-    # Here we use sparse_placeholder that will generate a SparseTensor required by ctc_loss op.
+    inputs = tf.placeholder(tf.float32, [None, None, num_features]) # num feature is input length?
     targets = tf.sparse_placeholder(tf.int32)
     # 1d array of size [batch_size]
     seq_len = tf.placeholder(tf.int32, [None])
