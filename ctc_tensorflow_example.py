@@ -33,11 +33,11 @@ trainLableFn='./dataset/LDC93S1.txt'
 # trainLableFn='./dataset/bird'
 
 fs, audio = wav.read(trainInputFn)
-inputs = mfcc(audio, samplerate=fs)
+audioRawInputs = mfcc(audio, samplerate=fs)
 # Tranform in 3D array
-train_inputs = np.asarray(inputs[np.newaxis, :])
-train_inputs = (train_inputs - np.mean(train_inputs))/np.std(train_inputs)
-train_seq_len = [train_inputs.shape[1]]
+audioInputs = np.asarray(audioRawInputs[np.newaxis, :])
+audioInputs = (audioInputs - np.mean(audioInputs)) / np.std(audioInputs)
+audioInputsSeqLen = [audioInputs.shape[1]]
 
 with open(trainLableFn, 'r') as f:
     line = f.readlines()[-1]#Only the last line is necessary
@@ -49,11 +49,11 @@ targets = np.hstack([SPACE_TOKEN if x == '' else list(x) for x in targets])# Add
 targets = np.asarray([SPACE_INDEX if x == SPACE_TOKEN else ord(x) - FIRST_INDEX for x in targets])# Transform char into index
 train_targets = sparse_tuple_from([targets])# Creating sparse representation to feed the placeholder
 
-val_inputs, val_targets, val_seq_len = train_inputs, train_targets, train_seq_len# We don't have a validation dataset :(
+val_inputs, val_targets, val_seq_len = audioInputs, train_targets, audioInputsSeqLen# We don't have a validation dataset :(
 
 graph = tf.Graph()
 with graph.as_default():
-    inputs = tf.placeholder(tf.float32, [None, None, num_features])
+    audioRawInputs = tf.placeholder(tf.float32, [None, None, num_features])
     # Here we use sparse_placeholder that will generate a SparseTensor required by ctc_loss op.
     targets = tf.sparse_placeholder(tf.int32)
     # 1d array of size [batch_size]
@@ -61,9 +61,9 @@ with graph.as_default():
     cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
     stack = tf.contrib.rnn.MultiRNNCell([cell] * num_layers,state_is_tuple=True)
     # The second output is the last state and we will no use that
-    outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
+    outputs, _ = tf.nn.dynamic_rnn(stack, audioRawInputs, seq_len, dtype=tf.float32)
 
-    shape = tf.shape(inputs)
+    shape = tf.shape(audioRawInputs)
     batch_s, max_timesteps = shape[0], shape[1]
 
     # Reshaping to apply the same weights over the timesteps
@@ -96,9 +96,9 @@ with tf.Session(graph=graph) as session:
 
         for batch in range(num_batches_per_epoch):
 
-            feed = {inputs: train_inputs,
+            feed = {audioRawInputs: audioInputs,
                     targets: train_targets,
-                    seq_len: train_seq_len}
+                    seq_len: audioInputsSeqLen}
 
             batch_cost, _ = session.run([cost, optimizer], feed)
             train_cost += batch_cost*batch_size
@@ -107,7 +107,7 @@ with tf.Session(graph=graph) as session:
         train_cost /= num_examples
         train_ler /= num_examples
 
-        val_feed = {inputs: val_inputs,
+        val_feed = {audioRawInputs: val_inputs,
                     targets: val_targets,
                     seq_len: val_seq_len}
 
