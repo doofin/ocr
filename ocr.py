@@ -117,10 +117,16 @@ def labelFile2list(imageFN):
 def imageFilename2label(list, imageFileName_):
     return [x for x in list if x[0] == imageFileName_][0]
 
+def mainf():
+    imgFilename_labelList=[]
+    for x in list(map(lambda adir:adir.split('.')[0],os.listdir("ocrdata/"))):
+        foundLabel = imageFilename2label(labelFile2list(labelFileName), x)[9]
+        imgFilename_labelList.append([x+".png",foundLabel.replace('|',' ')])
+    p(imgFilename_labelList)
 
-
-foundLabel=imageFilename2label(labelFile2list(labelFileName), "n04-139-s01-01")[9]
-p(foundLabel)
-# ok or not : 2 , sentense : 9
-for imageFilename in os.listdir("ocrdata/"):
-    print(imageFilename)
+mainf()
+# foundLabel=imageFilename2label(labelFile2list(labelFileName), "n04-139-s01-01")[9]
+# p(foundLabel)
+# # ok or not : 2 , sentense : 9
+# for imageFilename in os.listdir("ocrdata/"):
+#     print(imageFilename)
