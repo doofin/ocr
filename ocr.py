@@ -9,14 +9,21 @@ import numpy as np
 from six.moves import xrange as range
 from utils import sparse_tuple_from as sparse_tuple_from
 from scipy import misc
+import string
 
+
+def p(x):print(x)
+characterListFull= string.ascii_lowercase + string.ascii_uppercase + " .,\n"
+characterListInUsage = characterListFull
+p(characterListInUsage)
 # A|MOVE|to|stop|Mr.|Gaitskell|from
-inputstring="A MOVE to stop Mr. Gaitskell from"
+inputstring = "A MOVE to stop Mr .Gaitskell from."
 SPACE_TOKEN = '<space>'
 SPACE_INDEX = 0
 FIRST_INDEX = ord('a') - 1  # 0 is reserved to space
-num_features = 13  # why?
-num_classes = ord('z') - ord('a') + 1 + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
+num_features = 13  # bigger -> worse!
+classOfCharacter = ord('z') - ord('a') + 1
+num_classes = len(characterListInUsage) + 1 + 1   # Accounting the 0th indice +  space + blank label = 28 characters
 
 num_epochs = 300
 num_hidden = 50
@@ -28,18 +35,19 @@ momentum = 0.9
 num_examples = 1
 num_batches_per_epoch = int(num_examples / batch_size)
 
-
-
-
-
-imgraw=misc.imread("ocrdata/a01-000u-s00-00.png").transpose()
+imgraw = misc.imread("ocrdata/a01-000u-s00-00.png").transpose()
 print("raw image")
 print(imgraw.shape)
-imgTensor = misc.imresize(imgraw,(242,13))
+rawW = imgraw.shape[0]
+rawH = imgraw.shape[1]
+print(rawW)
+imgHeight = num_features
+imgWidth = int(round(rawW * (imgHeight / rawH)))
+imgTensor = misc.imresize(imgraw, (imgWidth, imgHeight))
 
-tondarr=np.asarray(imgTensor[np.newaxis,:])
-transposed=tondarr
-normalized= (transposed - np.mean(transposed)) / np.std(transposed)
+tondarr = np.asarray(imgTensor[np.newaxis, :])
+transposed = tondarr
+normalized = (transposed - np.mean(transposed)) / np.std(transposed)
 
 print("img final")
 print(normalized.shape)
@@ -49,29 +57,23 @@ print(train_inputs.dtype)
 train_seq_len = [train_inputs.shape[1]]
 print(train_seq_len)
 
+# example = np.array(characterListInUsage.index(' '))
+# p("example")
+# p(example)
 
 def train():
-    lowered=inputstring.strip().lower()
-    print("lowered")
-    print(lowered)
-    original = ' '.join(lowered.split(' ')).replace('.', '').replace('\n','')
+    targets_intList= np.asarray([characterListInUsage.index(x) for x in inputstring])
+    print("char2index")
+    print(targets_intList)
 
-    # Get only the words between [a-z] and replace period for none
-    addedSpace = original.replace(' ', '  ')
-    splitted = addedSpace.split(' ')
-    print("splitted")
-    print(splitted)
-    targets = np.hstack([SPACE_TOKEN if x == '' else list(x) for x in splitted])  # Adding blank label
-    targets = np.asarray(
-        [SPACE_INDEX if x == SPACE_TOKEN else ord(x) - FIRST_INDEX for x in targets])  # Transform char into index
-    train_targets = sparse_tuple_from([targets])  # Creating sparse representation to feed the placeholder
+    train_targets = sparse_tuple_from([targets_intList])  # Creating sparse representation to feed the placeholder
 
     val_inputs, val_targets, val_seq_len = train_inputs, train_targets, train_seq_len  # We don't have a validation dataset :(
 
     graph = tf.Graph()
     with graph.as_default():
         inputs = tf.placeholder(tf.float32, [None, None, num_features])  # num feature is input length?
-        targets = tf.sparse_placeholder(tf.int32)
+        targets_intList = tf.sparse_placeholder(tf.int32)
         # 1d array of size [batch_size]
         seq_len = tf.placeholder(tf.int32, [None])
         cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
@@ -96,13 +98,13 @@ def train():
         # Reshaping back to the original shape
         # logits = tf.reshape(tf.matmul(outputs, W) + b, [batch_s, -1, num_classes])
         logits = tf.transpose(tf.reshape(tf.matmul(outputs, W) + b, [batch_s, -1, num_classes]), (1, 0, 2))
-        loss = tf.nn.ctc_loss(targets, logits, seq_len)
+        loss = tf.nn.ctc_loss(targets_intList, logits, seq_len)
         cost = tf.reduce_mean(loss)
         optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
         # Option 2: tf.nn.ctc_beam_search_decoder
         # (it's slower but you'll get better results)
         decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
-        ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32), targets))  # Inaccuracy: label error rate
+        ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32), targets_intList))  # Inaccuracy: label error rate
 
     with tf.Session(graph=graph) as sess:
         tf.global_variables_initializer().run()
@@ -112,7 +114,7 @@ def train():
 
             for batch in range(num_batches_per_epoch):
                 feed = {inputs: train_inputs,
-                        targets: train_targets,
+                        targets_intList: train_targets,
                         seq_len: train_seq_len}
 
                 batch_cost, _ = sess.run([cost, optimizer], feed)
@@ -123,7 +125,7 @@ def train():
             train_ler /= num_examples
 
             val_feed = {inputs: val_inputs,
-                        targets: val_targets,
+                        targets_intList: val_targets,
                         seq_len: val_seq_len}
 
             val_cost, val_ler = sess.run([cost, ler], feed_dict=val_feed)
@@ -136,13 +138,14 @@ def train():
         # Decoding
         result_dec = sess.run(decoded[0], feed_dict=feed)
 
-        str_decoded = ''.join([chr(x) for x in np.asarray(result_dec[1]) + FIRST_INDEX])
-        # Replacing blank label to none
-        str_decoded = str_decoded.replace(chr(ord('z') + 1), '')
-        # Replacing space label to space
-        str_decoded = str_decoded.replace(chr(ord('a') - 1), ' ')
+        p(result_dec)
+        p(result_dec[1])
+        result_dense=result_dec[1]
 
-        print('Original:\n%s' % original)
-        print('Decoded:\n%s' % str_decoded)
+        final_decoded=[characterListInUsage[i] for i in result_dense]
+        print('Original:\n%s' % inputstring)
+        print('Decoded:\n%s' % ''.join(final_decoded))
     # tf.saved_model.builder.SavedModelBuilder("savedModel").add_meta_graph_and_variables(session,["tfnn"])
+
+
 train()
