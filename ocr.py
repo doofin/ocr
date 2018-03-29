@@ -18,6 +18,7 @@ characterListInUsage = characterListFull
 p(characterListInUsage)
 # A|MOVE|to|stop|Mr.|Gaitskell|from
 inputstring = "A MOVE to stop Mr .Gaitskell from."
+inputimageName= "ocrdata/a01-000u-s00-00.png"
 
 
 num_features = 13  # bigger -> worse!
@@ -32,22 +33,6 @@ momentum = 0.9
 
 num_examples = 1
 num_batches_per_epoch = int(num_examples / batch_size)
-
-imgRaw = misc.imread("ocrdata/a01-000u-s00-00.png").transpose()
-print("raw image")
-print(imgRaw.shape)
-rawW = imgRaw.shape[0]
-rawH = imgRaw.shape[1]
-imgHeight = num_features
-imgWidth = int(round(rawW * (imgHeight / rawH)))
-imgTensor = misc.imresize(imgRaw, (imgWidth, imgHeight))
-
-imgNdarr = np.asarray(imgTensor[np.newaxis, :])
-transposedImgNdarr = imgNdarr
-normalizedImgNdarr = (transposedImgNdarr - np.mean(transposedImgNdarr)) / np.std(transposedImgNdarr)
-
-train_inputs = normalizedImgNdarr
-train_seq_len = [train_inputs.shape[1]]
 
 def img2tensor(imageNdarr_imread, labelStr):
     imgRaw_ = imageNdarr_imread.transpose()
@@ -66,27 +51,20 @@ def img2tensor(imageNdarr_imread, labelStr):
     label_dense = np.asarray([characterListInUsage.index(x) for x in labelStr])
     return normalizedImgNdarr,sparse_tuple_from([label_dense]),[normalizedImgNdarr.shape[1]]
 
-def train():
-    targets_intList = np.asarray([characterListInUsage.index(x) for x in inputstring])
-    print("char2index")
-    print(targets_intList)
-
-    train_targets = sparse_tuple_from([targets_intList])  # Creating sparse representation to feed the placeholder
-
-    val_inputs, val_targets, val_seq_len = train_inputs, train_targets, train_seq_len  # We don't have a validation dataset :(
-
+def train(x1sparse, y1sparse, y1len):
     graph = tf.Graph()
     with graph.as_default():
-        inputs_sink = tf.placeholder(tf.float32, [None, None, num_features])  # num feature is input length?
-        targets_intList = tf.sparse_placeholder(tf.int32)
+        sink_x = tf.sparse_placeholder(tf.int32)
+        sink_y = tf.placeholder(tf.float32, [None, None, num_features])  # num feature is input length?
         # 1d array of size [batch_size]
-        seq_len_sink = tf.placeholder(tf.int32, [None])
+        sink_lenth_y = tf.placeholder(tf.int32, [None])
+
         cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
         stack = tf.contrib.rnn.MultiRNNCell([cell] * num_layers, state_is_tuple=True)
         # The second output is the last state and we will no use that
-        outputs, _ = tf.nn.dynamic_rnn(stack, inputs_sink, seq_len_sink, dtype=tf.float32)
+        outputs, _ = tf.nn.dynamic_rnn(stack, sink_y, sink_lenth_y, dtype=tf.float32)
 
-        shape = tf.shape(inputs_sink)
+        shape = tf.shape(sink_y)
         batch_s, max_timesteps = shape[0], shape[1]
 
         # Reshaping to apply the same weights over the timesteps
@@ -103,14 +81,14 @@ def train():
         # Reshaping back to the original shape
         # logits = tf.reshape(tf.matmul(outputs, W) + b, [batch_s, -1, num_classes])
         logits = tf.transpose(tf.reshape(tf.matmul(outputs, W) + b, [batch_s, -1, num_classes]), (1, 0, 2))
-        loss = tf.nn.ctc_loss(targets_intList, logits, seq_len_sink)
+        loss = tf.nn.ctc_loss(sink_x, logits, sink_lenth_y)
         cost = tf.reduce_mean(loss)
         optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
         # Option 2: tf.nn.ctc_beam_search_decoder
         # (it's slower but you'll get better results)
-        decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len_sink)
-        ler = tf.reduce_mean(
-            tf.edit_distance(tf.cast(decoded[0], tf.int32), targets_intList))  # Inaccuracy: label error rate
+        decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_y)
+        ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32), sink_x))
+        # Inaccuracy: label error rate
 
     with tf.Session(graph=graph) as sess:
         tf.global_variables_initializer().run()
@@ -119,9 +97,9 @@ def train():
             start = time.time()
 
             for batch in range(num_batches_per_epoch):
-                feed = {inputs_sink: train_inputs,
-                        targets_intList: train_targets,
-                        seq_len_sink: train_seq_len}
+                feed = {sink_y: x1sparse,
+                        sink_x: y1sparse,
+                        sink_lenth_y: y1len}
 
                 batch_cost, _ = sess.run([cost, optimizer], feed)
                 train_cost += batch_cost * batch_size
@@ -130,17 +108,12 @@ def train():
             train_cost /= num_examples
             train_ler /= num_examples
 
-            val_feed = {inputs_sink: val_inputs,
-                        targets_intList: val_targets,
-                        seq_len_sink: val_seq_len}
-
-            val_cost, val_ler = sess.run([cost, ler], feed_dict=val_feed)
+            val_cost, val_ler = sess.run([cost, ler], feed_dict=feed)
 
             log = "Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, time = {:.3f}"
             print(log.format(curr_epoch + 1, num_epochs, train_cost, train_ler,
                              val_cost, val_ler, time.time() - start))
 
-        # Decoding
         result_dec = sess.run(decoded[0], feed_dict=feed)
 
         p(result_dec)
@@ -150,7 +123,6 @@ def train():
         final_decoded = [characterListInUsage[i] for i in result_dense]
         print('Original:\n%s' % inputstring)
         print('Decoded:\n%s' % ''.join(final_decoded))
-    # tf.saved_model.builder.SavedModelBuilder("savedModel").add_meta_graph_and_variables(session,["tfnn"])
 
-
-train()
+x1,y1,y1len=img2tensor(misc.imread(inputimageName), inputstring)
+train(x1,y1,y1len)
