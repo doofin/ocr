@@ -11,13 +11,11 @@ from utils import sparse_tuple_from as sparse_tuple_from
 from scipy import misc
 import string
 
-
 def p(x): print(x)
 
 
 characterListFull = string.ascii_lowercase + string.ascii_uppercase + " .,\n"
 characterListInUsage = characterListFull
-p(characterListInUsage)
 # A|MOVE|to|stop|Mr.|Gaitskell|from
 inputstring = "A MOVE to stop Mr .Gaitskell from."
 inputimageName = "ocrdata/a01-000u-s00-00.png"
@@ -25,15 +23,7 @@ inputimageName = "ocrdata/a01-000u-s00-00.png"
 num_features = 13  # bigger -> worse!
 num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
 
-num_epochs = 10
-num_hidden = 50
-num_layers = 1
-batch_size = 1
-initial_learning_rate = 1e-2
-momentum = 0.9
 
-num_examples = 1
-num_batches_per_epoch = int(num_examples / batch_size)
 
 
 def img2tensor(imageNdarr_imread, labelStr):
@@ -55,6 +45,15 @@ def img2tensor(imageNdarr_imread, labelStr):
 
 
 def train(datalist):
+    num_epochs = 10
+    num_hidden = 50
+    num_layers = 1
+    batch_size = 1
+    initial_learning_rate = 1e-2
+    momentum = 0.9
+    num_examples = 1
+    num_batches_per_epoch = int(num_examples / batch_size)
+
     graph = tf.Graph()
     with graph.as_default():
         sink_x = tf.sparse_placeholder(tf.int32)
@@ -80,8 +79,6 @@ def train(datalist):
             train_cost = train_ler = 0
             start = time.time()
             for idx,dataset in enumerate(datalist):
-                p("nth dataset")
-                print(idx)
                 feed = {sink_y: dataset[0],
                         sink_x: dataset[1],
                         sink_lenth_y: dataset[2]}
@@ -92,10 +89,10 @@ def train(datalist):
                 train_cost /= num_examples
                 train_ler /= num_examples
                 val_cost, val_ler = sess.run([cost, ler], feed_dict=feed)
+                print(str(curr_epoch)+","+str(idx))
                 log = "Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, time = {:.3f}"
                 print(log.format(curr_epoch + 1, num_epochs, train_cost, train_ler,
                                  val_cost, val_ler, time.time() - start))
-                idx+=1
 
         result_dec = sess.run(decoded[0], feed_dict=feed)
         result_dense = result_dec[1]
@@ -104,6 +101,18 @@ def train(datalist):
         print('Decoded:\n%s' % ''.join(final_decoded))
 
 
-p(list(map(lambda x: x, range(1, 10))))  # wtf
+# p(list(map(lambda x: x, range(1, 10))))  # wtf
 x1, y1, y1len = img2tensor(misc.imread(inputimageName), inputstring)
-train([[x1, y1, y1len],[x1, y1, y1len]])
+# train([[x1, y1, y1len],[x1, y1, y1len]])
+
+import os
+labelFileName="sentences.txt"
+
+def imageFilename2label(imageFN):
+    crimefile = open(labelFileName, 'r')
+    yourResult = [line.replace('\n','').split(' ') for line in crimefile.readlines()]
+    # return list(map(lambda x:x[0],yourResult))
+    return yourResult
+print(imageFilename2label("")[:2])
+for imageFilename in os.listdir("ocrdata/"):
+    print(imageFilename)
