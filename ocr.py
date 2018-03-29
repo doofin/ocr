@@ -11,6 +11,7 @@ from utils import sparse_tuple_from as sparse_tuple_from
 from scipy import misc
 import string
 
+
 def p(x): print(x)
 
 
@@ -22,8 +23,6 @@ inputimageName = "ocrdata/a01-000u-s00-00.png"
 
 num_features = 13  # bigger -> worse!
 num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
-
-
 
 
 def img2tensor(imageNdarr_imread, labelStr):
@@ -78,7 +77,7 @@ def train(datalist):
         for curr_epoch in range(num_epochs):
             train_cost = train_ler = 0
             start = time.time()
-            for idx,dataset in enumerate(datalist):
+            for idx, dataset in enumerate(datalist):
                 feed = {sink_y: dataset[0],
                         sink_x: dataset[1],
                         sink_lenth_y: dataset[2]}
@@ -89,7 +88,7 @@ def train(datalist):
                 train_cost /= num_examples
                 train_ler /= num_examples
                 val_cost, val_ler = sess.run([cost, ler], feed_dict=feed)
-                print(str(curr_epoch)+","+str(idx))
+                print(str(curr_epoch) + "," + str(idx))
                 log = "Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, time = {:.3f}"
                 print(log.format(curr_epoch + 1, num_epochs, train_cost, train_ler,
                                  val_cost, val_ler, time.time() - start))
@@ -106,13 +105,22 @@ x1, y1, y1len = img2tensor(misc.imread(inputimageName), inputstring)
 # train([[x1, y1, y1len],[x1, y1, y1len]])
 
 import os
-labelFileName="sentences.txt"
 
-def imageFilename2label(imageFN):
+labelFileName = "sentences.txt"
+
+
+def labelFile2list(imageFN):
     crimefile = open(labelFileName, 'r')
-    yourResult = [line.replace('\n','').split(' ') for line in crimefile.readlines()]
-    # return list(map(lambda x:x[0],yourResult))
-    return yourResult
-print(imageFilename2label("")[:2])
+    return [line.replace('\n', '').split(' ') for line in crimefile.readlines()]
+
+
+def imageFilename2label(list, imageFileName_):
+    return [x for x in list if x[0] == imageFileName_][0]
+
+
+
+foundLabel=imageFilename2label(labelFile2list(labelFileName), "n04-139-s01-01")[9]
+p(foundLabel)
+# ok or not : 2 , sentense : 9
 for imageFilename in os.listdir("ocrdata/"):
     print(imageFilename)
