@@ -44,7 +44,7 @@ def img2tensor(imageNdarr_imread, labelStr):
 
 
 def train(datalist):
-    num_epochs = 10
+    num_epochs = 100
     num_hidden = 50
     num_layers = 1
     batch_size = 1
@@ -124,6 +124,9 @@ def mainf():
         imgFilename_labelList.append([x+".png",foundLabel.replace('|',' ')])
     p(imgFilename_labelList)
 
+    feedable=[img2tensor(misc.imread("ocrdata/"+x[0]),x[1]) for x in imgFilename_labelList]
+    finalfeedable=[ [x[0],x[1],x[2]] for x in feedable]
+    train(finalfeedable)
 mainf()
 # foundLabel=imageFilename2label(labelFile2list(labelFileName), "n04-139-s01-01")[9]
 # p(foundLabel)
