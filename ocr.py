@@ -11,20 +11,21 @@ from utils import sparse_tuple_from as sparse_tuple_from
 from scipy import misc
 import string
 
+
 def p(x): print(x)
+
 
 characterListFull = string.ascii_lowercase + string.ascii_uppercase + " .,\n"
 characterListInUsage = characterListFull
 p(characterListInUsage)
 # A|MOVE|to|stop|Mr.|Gaitskell|from
 inputstring = "A MOVE to stop Mr .Gaitskell from."
-inputimageName= "ocrdata/a01-000u-s00-00.png"
-
+inputimageName = "ocrdata/a01-000u-s00-00.png"
 
 num_features = 13  # bigger -> worse!
 num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
 
-num_epochs = 200
+num_epochs = 10
 num_hidden = 50
 num_layers = 1
 batch_size = 1
@@ -33,6 +34,7 @@ momentum = 0.9
 
 num_examples = 1
 num_batches_per_epoch = int(num_examples / batch_size)
+
 
 def img2tensor(imageNdarr_imread, labelStr):
     imgRaw_ = imageNdarr_imread.transpose()
@@ -49,7 +51,8 @@ def img2tensor(imageNdarr_imread, labelStr):
     normalizedImgNdarr = (transposedImgNdarr - np.mean(transposedImgNdarr)) / np.std(transposedImgNdarr)
 
     label_dense = np.asarray([characterListInUsage.index(x) for x in labelStr])
-    return normalizedImgNdarr,sparse_tuple_from([label_dense]),[normalizedImgNdarr.shape[1]]
+    return normalizedImgNdarr, sparse_tuple_from([label_dense]), [normalizedImgNdarr.shape[1]]
+
 
 def train(x1sparse, y1sparse, y1len):
     graph = tf.Graph()
@@ -96,33 +99,39 @@ def train(x1sparse, y1sparse, y1len):
             train_cost = train_ler = 0
             start = time.time()
 
-            for batch in range(num_batches_per_epoch):
-                feed = {sink_y: x1sparse,
-                        sink_x: y1sparse,
-                        sink_lenth_y: y1len}
+            # for batch in range(num_batches_per_epoch):
+            for dataset in [[x1sparse, y1sparse, y1len], [x1sparse, y1sparse, y1len]]:
+                idx=0
+                p("nth dataset")
+                print(idx)
+                feed = {sink_y: dataset[0],
+                        sink_x: dataset[1],
+                        sink_lenth_y: dataset[2]}
 
                 batch_cost, _ = sess.run([cost, optimizer], feed)
                 train_cost += batch_cost * batch_size
                 train_ler += sess.run(ler, feed_dict=feed) * batch_size
 
-            train_cost /= num_examples
-            train_ler /= num_examples
+                train_cost /= num_examples
+                train_ler /= num_examples
 
-            val_cost, val_ler = sess.run([cost, ler], feed_dict=feed)
-
-            log = "Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, time = {:.3f}"
-            print(log.format(curr_epoch + 1, num_epochs, train_cost, train_ler,
-                             val_cost, val_ler, time.time() - start))
+                val_cost, val_ler = sess.run([cost, ler], feed_dict=feed)
+                log = "Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, time = {:.3f}"
+                print(log.format(curr_epoch + 1, num_epochs, train_cost, train_ler,
+                                 val_cost, val_ler, time.time() - start))
+                idx+=1
 
         result_dec = sess.run(decoded[0], feed_dict=feed)
-
-        p(result_dec)
-        p(result_dec[1])
         result_dense = result_dec[1]
 
         final_decoded = [characterListInUsage[i] for i in result_dense]
         print('Original:\n%s' % inputstring)
         print('Decoded:\n%s' % ''.join(final_decoded))
 
-x1,y1,y1len=img2tensor(misc.imread(inputimageName), inputstring)
-train(x1,y1,y1len)
+
+p(list(map(lambda x: x, range(1, 10))))  # wtf
+x1, y1, y1len = img2tensor(misc.imread(inputimageName), inputstring)
+train(x1, y1, y1len)
+for x in [[1,2],[3,4]]:
+    for y in x:
+        p(y)

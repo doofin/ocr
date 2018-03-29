@@ -28,8 +28,8 @@
       <file leaf-file-name="ocr.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/ocr.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="532">
-              <caret line="52" lean-forward="true" selection-start-line="52" selection-end-line="52" />
+            <state relative-caret-position="224">
+              <caret line="102" column="12" selection-start-line="102" selection-start-column="12" selection-end-line="102" selection-end-column="12" />
               <folding>
                 <element signature="e#0#38#0" expanded="true" />
               </folding>
@@ -80,6 +80,7 @@
       <find>ldc</find>
       <find>13</find>
       <find>targets_in</find>
+      <find>break</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -433,8 +434,8 @@
     <entry file="file:///usr/local/lib/python3.5/dist-packages/scipy/misc/__init__.py" />
     <entry file="file://$PROJECT_DIR$/ocr.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="532">
-          <caret line="52" lean-forward="true" selection-start-line="52" selection-end-line="52" />
+        <state relative-caret-position="224">
+          <caret line="102" column="12" selection-start-line="102" selection-start-column="12" selection-end-line="102" selection-end-column="12" />
           <folding>
             <element signature="e#0#38#0" expanded="true" />
           </folding>
