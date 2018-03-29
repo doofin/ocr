@@ -1,7 +1,5 @@
 
-./idea
-
-# Created by https://www.gitignore.io/api/macos,sublimetext,windows,linux,python,ruby,matlab
+.idea/
 
 ### macOS ###
 *.DS_Store
@@ -265,4 +263,3 @@ octave-workspace
 # Custom
 *.wav
 *.phn
-*.txt
