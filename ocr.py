@@ -13,15 +13,16 @@ import string
 
 
 def p(x): print(x)
+def sparse2dense(x):return x[1]
 
-
-characterListFull = string.ascii_lowercase + string.ascii_uppercase + " .,\n"
+characterListFull = string.ascii_lowercase + string.ascii_uppercase + " .,\n"+string.digits+string.punctuation
 characterListInUsage = characterListFull
 # A|MOVE|to|stop|Mr.|Gaitskell|from
 inputstring = "A MOVE to stop Mr .Gaitskell from."
 inputimageName = "ocrdata/a01-000u-s00-00.png"
+valiDir = "validata/"
 
-num_features = 13  # bigger -> worse!
+num_features = 10  # bigger -> worse!
 num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
 
 
@@ -38,13 +39,13 @@ def img2tensor(imageNdarr_imread, labelStr):
     imgNdarr = np.asarray(imgTensor_[np.newaxis, :])
     transposedImgNdarr = imgNdarr
     normalizedImgNdarr = (transposedImgNdarr - np.mean(transposedImgNdarr)) / np.std(transposedImgNdarr)
-
+    p(labelStr)
     label_dense = np.asarray([characterListInUsage.index(x) for x in labelStr])
     return normalizedImgNdarr, sparse_tuple_from([label_dense]), [normalizedImgNdarr.shape[1]]
 
 
-def train(datalist):
-    num_epochs = 100
+def train(datalist,valilist):
+    num_epochs = 200
     num_hidden = 50
     num_layers = 1
     batch_size = 1
@@ -93,15 +94,19 @@ def train(datalist):
                 print(log.format(curr_epoch + 1, num_epochs, train_cost, train_ler,
                                  val_cost, val_ler, time.time() - start))
 
-        result_dec = sess.run(decoded[0], feed_dict=feed)
-        result_dense = result_dec[1]
-        final_decoded = [characterListInUsage[i] for i in result_dense]
-        print('Original:\n%s' % inputstring)
-        print('Decoded:\n%s' % ''.join(final_decoded))
+        vald=valilist[0]
+        feed2 = {sink_y: vald[0],
+                sink_x: vald[1],
+                sink_lenth_y: vald[2]}
+        result_sparse = sess.run(decoded[0], feed_dict=feed2)
+        # result_dense = result_sparse[1]
+        # final_decoded = [characterListInUsage[i] for i in sparse2dense(result_sparse)]
+        print('Original:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(vald[1])]))
+        print('Decoded:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(result_sparse)]))
 
 
 # p(list(map(lambda x: x, range(1, 10))))  # wtf
-x1, y1, y1len = img2tensor(misc.imread(inputimageName), inputstring)
+# x1, y1, y1len = img2tensor(misc.imread(inputimageName), inputstring)
 # train([[x1, y1, y1len],[x1, y1, y1len]])
 
 import os
@@ -117,17 +122,41 @@ def labelFile2list(imageFN):
 def imageFilename2label(list, imageFileName_):
     return [x for x in list if x[0] == imageFileName_][0]
 
-def mainf():
-    imgFilename_labelList=[]
-    for x in list(map(lambda adir:adir.split('.')[0],os.listdir("ocrdata/"))):
+
+def dir2finalDataList(imgDir):
+    imgFilename_labelList = []
+    for x in list(map(lambda adir: adir.split('.')[0], os.listdir(imgDir))):
         foundLabel = imageFilename2label(labelFile2list(labelFileName), x)[9]
-        imgFilename_labelList.append([x+".png",foundLabel.replace('|',' ')])
+        imgFilename_labelList.append([x + ".png", foundLabel.replace('|', ' ')])
     p(imgFilename_labelList)
 
-    feedable=[img2tensor(misc.imread("ocrdata/"+x[0]),x[1]) for x in imgFilename_labelList]
-    finalfeedable=[ [x[0],x[1],x[2]] for x in feedable]
-    train(finalfeedable)
+    finalfeedable = [[x[0], x[1], x[2]] for x in
+                     [img2tensor(misc.imread(imgDir + y[0]), y[1]) for y in imgFilename_labelList]]
+    return finalfeedable
+
+def mainSingle():
+    inputstring = "A MOVE to stop Mr .Gaitskell from."
+    inputimageName = "ocrdata/a01-000u-s00-00.png"
+    x1, y1, y1len = img2tensor(misc.imread(inputimageName), inputstring)
+    train([[x1,y1,y1len]])
+def mainf():
+    # imgFilename_labelList=[]
+    # for x in list(map(lambda adir:adir.split('.')[0],os.listdir("ocrdata/"))):
+    #     foundLabel = imageFilename2label(labelFile2list(labelFileName), x)[9]
+    #     imgFilename_labelList.append([x+".png",foundLabel.replace('|',' ')])
+    # p(imgFilename_labelList)
+    #
+    # # feedable=[img2tensor(misc.imread("ocrdata/"+x[0]),x[1]) for x in imgFilename_labelList]
+    # finalfeedable=[ [x[0],x[1],x[2]] for x in [img2tensor(misc.imread("ocrdata/"+x[0]),x[1]) for x in imgFilename_labelList]]
+    datalist=dir2finalDataList("ocrdata/")
+    valilist = dir2finalDataList("validata/")
+    train(datalist,valilist)
+
+
 mainf()
+# mainSingle()
+
+
 # foundLabel=imageFilename2label(labelFile2list(labelFileName), "n04-139-s01-01")[9]
 # p(foundLabel)
 # # ok or not : 2 , sentense : 9
