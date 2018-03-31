@@ -10,19 +10,23 @@ from six.moves import xrange as range
 from utils import sparse_tuple_from as sparse_tuple_from
 from scipy import misc
 import string
+import random
 
 
 def p(x): print(x)
-def sparse2dense(x):return x[1]
 
-characterListFull = string.ascii_lowercase + string.ascii_uppercase + " .,\n"+string.digits+string.punctuation
+
+def sparse2dense(x): return x[1]
+
+
+characterListFull = string.ascii_lowercase + string.ascii_uppercase + " .,\n" + string.digits + string.punctuation  # "'!?\"-:()"
 characterListInUsage = characterListFull
 # A|MOVE|to|stop|Mr.|Gaitskell|from
 inputstring = "A MOVE to stop Mr .Gaitskell from."
 inputimageName = "ocrdata/a01-000u-s00-00.png"
 valiDir = "validata/"
 
-num_features = 10  # bigger -> worse!
+num_features = 11  # bigger -> worse!
 num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
 
 
@@ -44,15 +48,14 @@ def img2tensor(imageNdarr_imread, labelStr):
     return normalizedImgNdarr, sparse_tuple_from([label_dense]), [normalizedImgNdarr.shape[1]]
 
 
-def train(datalist,valilist):
-    num_epochs = 200
-    num_hidden = 50
+def lstmCtcGraph():
+    num_epochs = 500
+    num_hidden = 82
     num_layers = 1
     batch_size = 1
-    initial_learning_rate = 1e-2
+    initial_learning_rate = 1e-3
     momentum = 0.9
     num_examples = 1
-    num_batches_per_epoch = int(num_examples / batch_size)
 
     graph = tf.Graph()
     with graph.as_default():
@@ -68,24 +71,44 @@ def train(datalist,valilist):
         W = tf.Variable(tf.truncated_normal([num_hidden, num_classes], stddev=0.1))
         b = tf.Variable(tf.constant(0., shape=[num_classes]))
         logits = tf.transpose(tf.reshape(tf.matmul(outputs, W) + b, [batch_s, -1, num_classes]), (1, 0, 2))
-        loss = tf.nn.ctc_loss(sink_x, logits, sink_lenth_y)
-        cost = tf.reduce_mean(loss)
+
+        cost = tf.reduce_mean(tf.nn.ctc_loss(sink_x, logits, sink_lenth_y))
         optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
         decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_y)
         ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32), sink_x))
+        return sink_x, sink_y, sink_lenth_y, decoded, cost, optimizer, ler, graph
+
+
+def train(datalist, valilist):
+    num_epochs = 500
+    # num_hidden = 82
+    # num_layers = 1
+    batch_size = 1
+    # initial_learning_rate = 1e-3
+    # momentum = 0.9
+    num_examples = 1
+    sink_x, sink_y, sink_lenth_y, decoded, cost, optimizer, ler, graph = lstmCtcGraph()
+
     with tf.Session(graph=graph) as sess:
         tf.global_variables_initializer().run()
+        vald = valilist[0]
+        # vald=datalist[0]
         for curr_epoch in range(num_epochs):
             train_cost = train_ler = 0
             start = time.time()
-            for idx, dataset in enumerate(datalist):
-                feed = {sink_y: dataset[0],
-                        sink_x: dataset[1],
-                        sink_lenth_y: dataset[2]}
+            datalistRandom = datalist
+            random.shuffle(datalistRandom)
+            for idx, datalistRandom in enumerate(datalistRandom):
+                feed = {sink_y: datalistRandom[0],
+                        sink_x: datalistRandom[1],
+                        sink_lenth_y: datalistRandom[2]}
 
                 batch_cost, _ = sess.run([cost, optimizer], feed)
-                train_cost += batch_cost * batch_size
-                train_ler += sess.run(ler, feed_dict=feed) * batch_size
+                # train_cost += batch_cost * batch_size
+                # train_ler += sess.run(ler, feed_dict=feed) * batch_size
+                train_cost = batch_cost * batch_size
+                train_ler = sess.run(ler, feed_dict=feed) * batch_size
+
                 train_cost /= num_examples
                 train_ler /= num_examples
                 val_cost, val_ler = sess.run([cost, ler], feed_dict=feed)
@@ -93,21 +116,14 @@ def train(datalist,valilist):
                 log = "Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, time = {:.3f}"
                 print(log.format(curr_epoch + 1, num_epochs, train_cost, train_ler,
                                  val_cost, val_ler, time.time() - start))
-
-        vald=valilist[0]
-        feed2 = {sink_y: vald[0],
-                sink_x: vald[1],
-                sink_lenth_y: vald[2]}
-        result_sparse = sess.run(decoded[0], feed_dict=feed2)
-        # result_dense = result_sparse[1]
-        # final_decoded = [characterListInUsage[i] for i in sparse2dense(result_sparse)]
-        print('Original:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(vald[1])]))
-        print('Decoded:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(result_sparse)]))
-
-
-# p(list(map(lambda x: x, range(1, 10))))  # wtf
-# x1, y1, y1len = img2tensor(misc.imread(inputimageName), inputstring)
-# train([[x1, y1, y1len],[x1, y1, y1len]])
+                feed2 = {sink_y: vald[0],
+                         sink_x: vald[1],
+                         sink_lenth_y: vald[2]}
+                result_sparse = sess.run(decoded[0], feed_dict=feed2)
+                costvalid, lerValid = sess.run([cost, ler], feed_dict=feed2)
+                print('Original:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(vald[1])]))
+                print('Decoded:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(result_sparse)]))
+                p('ler : %s' % lerValid)
 
 import os
 
@@ -126,19 +142,25 @@ def imageFilename2label(list, imageFileName_):
 def dir2finalDataList(imgDir):
     imgFilename_labelList = []
     for x in list(map(lambda adir: adir.split('.')[0], os.listdir(imgDir))):
-        foundLabel = imageFilename2label(labelFile2list(labelFileName), x)[9]
-        imgFilename_labelList.append([x + ".png", foundLabel.replace('|', ' ')])
+        interm = imageFilename2label(labelFile2list(labelFileName), x)
+        # p(interm)
+        foundLabel = imageFilename2label(labelFile2list(labelFileName), x)
+        if foundLabel[2] == 'ok':
+            imgFilename_labelList.append([x + ".png", foundLabel[9].replace('|', ' ')])
     p(imgFilename_labelList)
 
     finalfeedable = [[x[0], x[1], x[2]] for x in
                      [img2tensor(misc.imread(imgDir + y[0]), y[1]) for y in imgFilename_labelList]]
     return finalfeedable
 
+
 def mainSingle():
     inputstring = "A MOVE to stop Mr .Gaitskell from."
     inputimageName = "ocrdata/a01-000u-s00-00.png"
     x1, y1, y1len = img2tensor(misc.imread(inputimageName), inputstring)
-    train([[x1,y1,y1len]])
+    train([[x1, y1, y1len]])
+
+
 def mainf():
     # imgFilename_labelList=[]
     # for x in list(map(lambda adir:adir.split('.')[0],os.listdir("ocrdata/"))):
@@ -148,9 +170,9 @@ def mainf():
     #
     # # feedable=[img2tensor(misc.imread("ocrdata/"+x[0]),x[1]) for x in imgFilename_labelList]
     # finalfeedable=[ [x[0],x[1],x[2]] for x in [img2tensor(misc.imread("ocrdata/"+x[0]),x[1]) for x in imgFilename_labelList]]
-    datalist=dir2finalDataList("ocrdata/")
+    datalist = dir2finalDataList("ocrdata/")
     valilist = dir2finalDataList("validata/")
-    train(datalist,valilist)
+    train(datalist, valilist)
 
 
 mainf()
