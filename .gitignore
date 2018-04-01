@@ -1,5 +1,7 @@
 
 .idea/
+ocrdata/
+moredata/
 
 ### macOS ###
 *.DS_Store
