@@ -80,7 +80,7 @@ def lstmCtcGraph():
 
 
 def train(datalist, valilist):
-    num_epochs = 500
+    num_epochs = 1500
     # num_hidden = 82
     # num_layers = 1
     batch_size = 1
@@ -95,6 +95,8 @@ def train(datalist, valilist):
         # vald=datalist[0]
         for curr_epoch in range(num_epochs):
             train_cost = train_ler = 0
+            ler_accum=0
+            ler_avg=1
             start = time.time()
             datalistRandom = datalist
             random.shuffle(datalistRandom)
@@ -108,14 +110,17 @@ def train(datalist, valilist):
                 # train_ler += sess.run(ler, feed_dict=feed) * batch_size
                 train_cost = batch_cost * batch_size
                 train_ler = sess.run(ler, feed_dict=feed) * batch_size
+                ler_accum+=train_ler
+                ler_avg=ler_accum/len(datalistRandom)
 
                 train_cost /= num_examples
                 train_ler /= num_examples
                 val_cost, val_ler = sess.run([cost, ler], feed_dict=feed)
                 print(str(curr_epoch) + "," + str(idx))
-                log = "Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, time = {:.3f}"
-                print(log.format(curr_epoch + 1, num_epochs, train_cost, train_ler,
-                                 val_cost, val_ler, time.time() - start))
+                print("Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, accumLer = {:.3f},time = {:.3f}"
+                      .format(curr_epoch + 1, num_epochs, train_cost, train_ler,ler_avg,
+                                 val_cost, val_ler, time.time() - start)
+                      )
                 feed2 = {sink_y: vald[0],
                          sink_x: vald[1],
                          sink_lenth_y: vald[2]}
@@ -124,6 +129,8 @@ def train(datalist, valilist):
                 print('Original:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(vald[1])]))
                 print('Decoded:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(result_sparse)]))
                 p('ler : %s' % lerValid)
+            if ler_accum < 0.01 :
+                break
 
 import os
 
