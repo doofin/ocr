@@ -65,7 +65,7 @@ def sliceImg(imgparams):
     for r in iters:
         p("sliceImg")
         p(str(r))
-        item=img[r:cnnWidth,:]
+        item=img[r:cnnWidth+r,:]
         p(item.shape)
         # sliceList.append()
 
@@ -142,6 +142,7 @@ def train(datalist, valilist):
 
                 train_cost /= num_examples
                 train_ler /= num_examples
+
                 val_cost, val_ler = sess.run([cost, ler], feed_dict=feed)
                 print(str(curr_epoch) + "," + str(idx))
                 print("Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, accumLer = {:.3f},time = {:.3f}"
