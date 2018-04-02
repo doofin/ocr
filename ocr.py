@@ -40,13 +40,26 @@ def img2tensor(imageNdarr_imread, labelStr):
     imgWidth_ = int(round(rawW_ * (imgHeight_ / rawH_)))
     imgTensor_ = misc.imresize(imgRaw_, (imgWidth_, imgHeight_))
 
-    imgNdarr = np.asarray(imgTensor_[np.newaxis, :])
-    transposedImgNdarr = imgNdarr
+    transposedImgNdarr = np.asarray(imgTensor_[np.newaxis, :])
     normalizedImgNdarr = (transposedImgNdarr - np.mean(transposedImgNdarr)) / np.std(transposedImgNdarr)
     p(labelStr)
     label_dense = np.asarray([characterListInUsage.index(x) for x in labelStr])
-    return normalizedImgNdarr, sparse_tuple_from([label_dense]), [normalizedImgNdarr.shape[1]]
+    p('normalizedImgNdarr')
+    p(normalizedImgNdarr.shape)
+    # len(normalizedImgNdarr[0][0]) == num features =11
+    # len(normalizedImgNdarr[0]) == img width
+    p(len(normalizedImgNdarr[0]))
+    return normalizedImgNdarr, [normalizedImgNdarr.shape[1]], sparse_tuple_from([label_dense])
 
+
+def sliceImg(img, step):
+    cnnWidth = 20
+    imglen = len(img)
+    sliceList=[]
+    for r in range(1, imglen - cnnWidth, step):
+        p(str(r))
+        item=img[]
+        # sliceList.append()
 
 def lstmCtcGraph():
     num_epochs = 500
@@ -59,24 +72,28 @@ def lstmCtcGraph():
 
     graph = tf.Graph()
     with graph.as_default():
-        sink_x = tf.sparse_placeholder(tf.int32)
-        sink_y = tf.placeholder(tf.float32, [None, None, num_features])  # num feature is input length?
-        sink_lenth_y = tf.placeholder(tf.int32, [None])
+        sink_x = tf.placeholder(tf.float32, [None, None, num_features])  # num feature is input length?
+        sink_lenth_x = tf.placeholder(tf.int32, [None])
+        sink_y = tf.sparse_placeholder(tf.int32)  # targets
+
         cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
         stack = tf.contrib.rnn.MultiRNNCell([cell] * num_layers, state_is_tuple=True)
-        outputs, _ = tf.nn.dynamic_rnn(stack, sink_y, sink_lenth_y, dtype=tf.float32)
-        shape = tf.shape(sink_y)
-        batch_s, max_timesteps = shape[0], shape[1]
+        outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
+
+        sink_x_shape = tf.shape(sink_x)
+        batch_s, max_timesteps = sink_x_shape[0], sink_x_shape[1]
         outputs = tf.reshape(outputs, [-1, num_hidden])
         W = tf.Variable(tf.truncated_normal([num_hidden, num_classes], stddev=0.1))
         b = tf.Variable(tf.constant(0., shape=[num_classes]))
         logits = tf.transpose(tf.reshape(tf.matmul(outputs, W) + b, [batch_s, -1, num_classes]), (1, 0, 2))
 
-        cost = tf.reduce_mean(tf.nn.ctc_loss(sink_x, logits, sink_lenth_y))
+        cost = tf.reduce_mean(tf.nn.ctc_loss(sink_y, logits, sink_lenth_x))
         optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
-        decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_y)
-        ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32), sink_x))
-        return sink_x, sink_y, sink_lenth_y, decoded, cost, optimizer, ler, graph
+        decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_x)
+
+        ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32), sink_y))
+        # return sink_y, sink_x, sink_lenth_x, decoded, cost, optimizer, ler, graph
+        return sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph
 
 
 def train(datalist, valilist):
@@ -87,7 +104,7 @@ def train(datalist, valilist):
     # initial_learning_rate = 1e-3
     # momentum = 0.9
     num_examples = 1
-    sink_x, sink_y, sink_lenth_y, decoded, cost, optimizer, ler, graph = lstmCtcGraph()
+    sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph = lstmCtcGraph()
 
     with tf.Session(graph=graph) as sess:
         tf.global_variables_initializer().run()
@@ -95,42 +112,45 @@ def train(datalist, valilist):
         # vald=datalist[0]
         for curr_epoch in range(num_epochs):
             train_cost = train_ler = 0
-            ler_accum=0
-            ler_avg=1
+            ler_accum = 0
+            ler_avg = 1
             start = time.time()
             datalistRandom = datalist
             random.shuffle(datalistRandom)
             for idx, datalistRandom in enumerate(datalistRandom):
-                feed = {sink_y: datalistRandom[0],
-                        sink_x: datalistRandom[1],
-                        sink_lenth_y: datalistRandom[2]}
+                feed = {sink_x: datalistRandom[0],
+                        sink_lenth_x: datalistRandom[1],
+                        sink_y: datalistRandom[2]
+                        }
 
                 batch_cost, _ = sess.run([cost, optimizer], feed)
                 # train_cost += batch_cost * batch_size
                 # train_ler += sess.run(ler, feed_dict=feed) * batch_size
                 train_cost = batch_cost * batch_size
                 train_ler = sess.run(ler, feed_dict=feed) * batch_size
-                ler_accum+=train_ler
-                ler_avg=ler_accum/len(datalistRandom)
+                ler_accum += train_ler
+                ler_avg = ler_accum / len(datalistRandom)
 
                 train_cost /= num_examples
                 train_ler /= num_examples
                 val_cost, val_ler = sess.run([cost, ler], feed_dict=feed)
                 print(str(curr_epoch) + "," + str(idx))
                 print("Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, accumLer = {:.3f},time = {:.3f}"
-                      .format(curr_epoch + 1, num_epochs, train_cost, train_ler,ler_avg,
-                                 val_cost, val_ler, time.time() - start)
+                      .format(curr_epoch + 1, num_epochs, train_cost, train_ler, ler_avg,
+                              val_cost, val_ler, time.time() - start)
                       )
-                feed2 = {sink_y: vald[0],
-                         sink_x: vald[1],
-                         sink_lenth_y: vald[2]}
+                feed2 = {sink_x: vald[0],
+                         sink_lenth_x: vald[1],
+                         sink_y: vald[2]
+                         }
                 result_sparse = sess.run(decoded[0], feed_dict=feed2)
                 costvalid, lerValid = sess.run([cost, ler], feed_dict=feed2)
-                print('Original:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(vald[1])]))
+                print('Original:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(vald[2])]))
                 print('Decoded:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(result_sparse)]))
                 p('ler : %s' % lerValid)
-            if ler_accum < 0.01 :
+            if ler_accum < 0.01:
                 break
+
 
 import os
 
