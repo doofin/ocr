@@ -49,16 +49,24 @@ def img2tensor(imageNdarr_imread, labelStr):
     # len(normalizedImgNdarr[0][0]) == num features =11
     # len(normalizedImgNdarr[0]) == img width
     p(len(normalizedImgNdarr[0]))
+    sliceImg(normalizedImgNdarr)
     return normalizedImgNdarr, [normalizedImgNdarr.shape[1]], sparse_tuple_from([label_dense])
 
 
-def sliceImg(img, step):
+def sliceImg(imgparams):
+    # img shape is ,wid,hei   (142, 11)
     cnnWidth = 20
+    step=3
+    img=imgparams[0]
     imglen = len(img)
     sliceList=[]
-    for r in range(1, imglen - cnnWidth, step):
+    iters=range(0, imglen - cnnWidth, step)
+    p("sliceImg:"+str(iters)+","+str(img.shape)+",imglen:"+str(imglen))
+    for r in iters:
+        p("sliceImg")
         p(str(r))
-        item=img[]
+        item=img[r:cnnWidth,:]
+        p(item.shape)
         # sliceList.append()
 
 def lstmCtcGraph():
@@ -66,7 +74,8 @@ def lstmCtcGraph():
     num_hidden = 82
     num_layers = 1
     batch_size = 1
-    initial_learning_rate = 1e-3
+    initial_learning_rate = 1e-2
+    # initial_learning_rate = 1e-3
     momentum = 0.9
     num_examples = 1
 
@@ -178,6 +187,7 @@ def dir2finalDataList(imgDir):
 
     finalfeedable = [[x[0], x[1], x[2]] for x in
                      [img2tensor(misc.imread(imgDir + y[0]), y[1]) for y in imgFilename_labelList]]
+
     return finalfeedable
 
 
@@ -189,25 +199,9 @@ def mainSingle():
 
 
 def mainf():
-    # imgFilename_labelList=[]
-    # for x in list(map(lambda adir:adir.split('.')[0],os.listdir("ocrdata/"))):
-    #     foundLabel = imageFilename2label(labelFile2list(labelFileName), x)[9]
-    #     imgFilename_labelList.append([x+".png",foundLabel.replace('|',' ')])
-    # p(imgFilename_labelList)
-    #
-    # # feedable=[img2tensor(misc.imread("ocrdata/"+x[0]),x[1]) for x in imgFilename_labelList]
-    # finalfeedable=[ [x[0],x[1],x[2]] for x in [img2tensor(misc.imread("ocrdata/"+x[0]),x[1]) for x in imgFilename_labelList]]
     datalist = dir2finalDataList("ocrdata/")
     valilist = dir2finalDataList("validata/")
     train(datalist, valilist)
 
-
-mainf()
-# mainSingle()
-
-
-# foundLabel=imageFilename2label(labelFile2list(labelFileName), "n04-139-s01-01")[9]
-# p(foundLabel)
-# # ok or not : 2 , sentense : 9
-# for imageFilename in os.listdir("ocrdata/"):
-#     print(imageFilename)
+# mainf()
+dir2finalDataList("validata/")
