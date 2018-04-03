@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import time
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 import numpy as np
 from six.moves import xrange as range
@@ -19,6 +20,8 @@ def p(x): print(x)
 def sparse2dense(x): return x[1]
 
 
+slicedImgWidth = 30
+
 characterListFull = string.ascii_lowercase + string.ascii_uppercase + " .,\n" + string.digits + string.punctuation  # "'!?\"-:()"
 characterListInUsage = characterListFull
 # A|MOVE|to|stop|Mr.|Gaitskell|from
@@ -26,8 +29,10 @@ inputstring = "A MOVE to stop Mr .Gaitskell from."
 inputimageName = "ocrdata/a01-000u-s00-00.png"
 valiDir = "validata/"
 
-num_features = 11  # bigger -> worse!
+num_features = 12  # bigger -> worse!
 num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
+
+imgct = 0
 
 
 def img2tensor(imageNdarr_imread, labelStr):
@@ -38,9 +43,8 @@ def img2tensor(imageNdarr_imread, labelStr):
     rawH_ = imgRaw_.shape[1]
     imgHeight_ = num_features
     imgWidth_ = int(round(rawW_ * (imgHeight_ / rawH_)))
-    imgTensor_ = misc.imresize(imgRaw_, (imgWidth_, imgHeight_))
-
-    transposedImgNdarr = np.asarray(imgTensor_[np.newaxis, :])
+    imgResized = misc.imresize(imgRaw_, (imgWidth_, imgHeight_))
+    transposedImgNdarr = np.asarray(imgResized[np.newaxis, :])
     normalizedImgNdarr = (transposedImgNdarr - np.mean(transposedImgNdarr)) / np.std(transposedImgNdarr)
     p(labelStr)
     label_dense = np.asarray([characterListInUsage.index(x) for x in labelStr])
@@ -48,47 +52,37 @@ def img2tensor(imageNdarr_imread, labelStr):
     p(normalizedImgNdarr.shape)
     # len(normalizedImgNdarr[0][0]) == num features =11
     # len(normalizedImgNdarr[0]) == img width
-    p(len(normalizedImgNdarr[0]))
-    sliceImg(normalizedImgNdarr)
+    # p(len(normalizedImgNdarr[0]))
+    # sliceImg(normalizedImgNdarr)
     return normalizedImgNdarr, [normalizedImgNdarr.shape[1]], sparse_tuple_from([label_dense])
 
 
-def sliceImg(imgparams):
-    # img shape is ,wid,hei   (142, 11)
-    cnnWidth = 20
-    step=3
-    img=imgparams[0]
-    imglen = len(img)
-    sliceList=[]
-    iters=range(0, imglen - cnnWidth, step)
-    p("sliceImg:"+str(iters)+","+str(img.shape)+",imglen:"+str(imglen))
-    for r in iters:
-        p("sliceImg")
-        p(str(r))
-        item=img[r:cnnWidth+r,:]
-        p(item.shape)
-        # sliceList.append()
-
-def lstmCtcGraph():
-    num_epochs = 500
-    num_hidden = 82
-    num_layers = 1
-    batch_size = 1
-    initial_learning_rate = 1e-2
-    # initial_learning_rate = 1e-3
-    momentum = 0.9
-    num_examples = 1
+def biLstmCtcGraph():
+    num_hidden = 100
+    initial_learning_rate = 1e-3
 
     graph = tf.Graph()
     with graph.as_default():
         sink_x = tf.placeholder(tf.float32, [None, None, num_features])  # num feature is input length?
         sink_lenth_x = tf.placeholder(tf.int32, [None])
         sink_y = tf.sparse_placeholder(tf.int32)  # targets
+        #
+        # cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
+        # stack = tf.contrib.rnn.MultiRNNCell(
+        #     [tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)] ,
+        #     state_is_tuple=True)
+        # frnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
+        # brnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
+        # frnn = tf.contrib.rnn.GRUCell(num_hidden)
+        # brnn = tf.contrib.rnn.GRUCell(num_hidden)]
 
-        cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-        stack = tf.contrib.rnn.MultiRNNCell([cell] * num_layers, state_is_tuple=True)
-        outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
+        frnn=tf.contrib.rnn.MultiRNNCell(
+            [tf.contrib.rnn.GRUCell(num_hidden) for i in [1, 1]])
+        brnn = tf.contrib.rnn.MultiRNNCell(
+            [tf.contrib.rnn.GRUCell(num_hidden) for i in [1, 1]])
 
+        # outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
+        outputs, _ = tf.nn.bidirectional_dynamic_rnn(frnn, brnn, sink_x, sink_lenth_x, dtype=tf.float32)
         sink_x_shape = tf.shape(sink_x)
         batch_s, max_timesteps = sink_x_shape[0], sink_x_shape[1]
         outputs = tf.reshape(outputs, [-1, num_hidden])
@@ -98,24 +92,21 @@ def lstmCtcGraph():
 
         cost = tf.reduce_mean(tf.nn.ctc_loss(sink_y, logits, sink_lenth_x))
         optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
-        decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_x)
+        # decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_x)
+        decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, sink_lenth_x)
 
         ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32), sink_y))
-        # return sink_y, sink_x, sink_lenth_x, decoded, cost, optimizer, ler, graph
         return sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph
 
 
 def train(datalist, valilist):
-    num_epochs = 1500
-    # num_hidden = 82
-    # num_layers = 1
+    num_epochs = 300
     batch_size = 1
-    # initial_learning_rate = 1e-3
-    # momentum = 0.9
     num_examples = 1
-    sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph = lstmCtcGraph()
+    sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph = biLstmCtcGraph()
 
     with tf.Session(graph=graph) as sess:
+        writer = tf.summary.FileWriter("/tmp/tflog", sess.graph)
         tf.global_variables_initializer().run()
         vald = valilist[0]
         # vald=datalist[0]
@@ -161,6 +152,8 @@ def train(datalist, valilist):
             if ler_accum < 0.01:
                 break
 
+    writer.close()
+
 
 import os
 
@@ -204,5 +197,6 @@ def mainf():
     valilist = dir2finalDataList("validata/")
     train(datalist, valilist)
 
-# mainf()
-dir2finalDataList("validata/")
+
+mainf()
+# dir2finalDataList("validata/")
