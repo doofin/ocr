@@ -40,18 +40,15 @@ def img2tensor(imageNdarr_imread, labelStr):
     imgWidth_ = int(round(rawW_ * (imgHeight_ / rawH_)))
     imgResized = misc.imresize(imgRaw_, (imgWidth_, imgHeight_))
 
-    transposedImgNdarr = np.asarray(imgResized[np.newaxis, :])
-    normalizedImgNdarr = (transposedImgNdarr - np.mean(transposedImgNdarr)) / np.std(transposedImgNdarr)
+    transposedImgNdarr = np.asarray(imgResized)
+    normalizedNdarr = (transposedImgNdarr - np.mean(transposedImgNdarr)) / np.std(transposedImgNdarr)
     p(labelStr)
-    label_dense = np.asarray([characterListInUsage.index(x) for x in labelStr])
     p('normalizedImgNdarr')
-    p(normalizedImgNdarr.shape) # 1 168 11
-    p(normalizedImgNdarr[0].shape)
-    p(normalizedImgNdarr[0][0].shape)
+    p(normalizedNdarr.shape) # 1 168 11
     p("sliced")
-    sliced=sliceImg(normalizedImgNdarr,slicedImgWidth)
+    sliced=sliceImg(normalizedNdarr,slicedImgWidth)
     p(sliced.shape) # 46,30 11
-    return sliced, [sliced.shape[1]], sparse_tuple_from([label_dense])
+    return sliced, [sliced.shape[1]], sparse_tuple_from([np.asarray([characterListInUsage.index(x) for x in labelStr])])
 
 
 def sliceImg(imgInParams, cnnWidth):
@@ -59,22 +56,23 @@ def sliceImg(imgInParams, cnnWidth):
     # (1,w,h) -> x=[(cnnw,h)] -> (1,len x,x)
     # need (1,len,(..))
     step=3
-    img=imgInParams[0] # w h
-    imglen = len(img) # w
-    sliceList=[]
+    imglen = len(imgInParams) # w
+    slicedNdarr=[]
     iters=range(0, imglen - cnnWidth, step)
-    p("sliceImg:"+str(iters)+","+str(img.shape)+",imglen:"+str(imglen))
+    p("sliceImg:"+str(iters)+","+str(imgInParams.shape)+",imglen:"+str(imglen))
     for r in iters:
         # p("sliceImg")
         # p(str(r))
-        item=img[r:cnnWidth+r,:]
+        item=imgInParams[r:cnnWidth+r,:]
         # p(item.shape)
-        sliceList.append(item)
-    sliceList=np.array(sliceList)
-    res=[x.flatten() for x in sliceList]
+        slicedNdarr.append(item)
+    slicedNdarr=np.array(slicedNdarr)
+    p('sliced item:'+str(slicedNdarr.shape))
+    res=[x.flatten() for x in slicedNdarr]
+    p(np.array([res]).shape)
     return np.array([res])
-def cnn():
-    sink_x = tf.placeholder(tf.float32, [slicedImgWidth, num_features])  #
+def cnn(sink_x):
+    # sink_x = tf.placeholder(tf.float32, [slicedImgWidth, num_features])  #
     input_layer = tf.reshape(sink_x, [-1, 28, 28, 1])
     conv1 = tf.layers.conv2d(
         inputs=input_layer,
@@ -90,104 +88,46 @@ def cnn():
         padding="same",
         activation=tf.nn.relu)
     pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2)
-    pool2_flat = tf.reshape(pool2, [-1, 7 * 7 * 64])
-    return sink_x,pool2_flat
+    output = tf.reshape(pool2, [-1, 7 * 7 * 64])
 
-def lstmCnnGraph():
-    num_hidden = 82
-    num_layers = 1
-    initial_learning_rate = 1e-2
+    return output
 
-    graph = tf.Graph()
-    with graph.as_default():
-        sink_x = tf.placeholder(tf.float32, [None, None, num_features])  #
-        sink_lenth_x = tf.placeholder(tf.int32, [None])
-        sink_y = tf.sparse_placeholder(tf.int32)  # targets
-
-        input_layer = tf.reshape(sink_x, [-1, 28, 28, 1])
-        conv1 = tf.layers.conv2d(
-            inputs=input_layer,
-            filters=32,
-            kernel_size=[5, 5],
-            padding="same",
-            activation=tf.nn.relu)
-        pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2)
-        conv2 = tf.layers.conv2d(
-            inputs=pool1,
-            filters=64,
-            kernel_size=[5, 5],
-            padding="same",
-            activation=tf.nn.relu)
-        pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2)
-        pool2_flat = tf.reshape(pool2, [-1, 7 * 7 * 64])
-
-        cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-        stack = tf.contrib.rnn.MultiRNNCell([cell] * num_layers, state_is_tuple=True)
-        outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
-
-        sink_x_shape = tf.shape(sink_x)
-        batch_s, max_timesteps = sink_x_shape[0], sink_x_shape[1]
-        outputs = tf.reshape(outputs, [-1, num_hidden])
-        W = tf.Variable(tf.truncated_normal([num_hidden, num_classes], stddev=0.1))
-        b = tf.Variable(tf.constant(0., shape=[num_classes]))
-        logits = tf.transpose(tf.reshape(tf.matmul(outputs, W) + b, [batch_s, -1, num_classes]), (1, 0, 2))
-
-        cost = tf.reduce_mean(tf.nn.ctc_loss(sink_y, logits, sink_lenth_x))
-        optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
-        decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_x)
-
-        ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32), sink_y))
-        return sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph
-def biLstmCtcSlicedGraph():
-    num_hidden = 130
-    initial_learning_rate = 1e-2
-    # (1,w,h) -> x=[(cnnw,h)] -> (1,len x,x)
-    graph = tf.Graph()
-    with graph.as_default():
-        sink_x = tf.placeholder(tf.float32, [1, None, slicedImgWidth,num_features])  # num feature is input length?
-        sink_lenth_x = tf.placeholder(tf.int32, [None])
-        sink_y = tf.sparse_placeholder(tf.int32)  # targets
-
-        cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-        stack = tf.contrib.rnn.MultiRNNCell(
-            [tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)] ,
-            state_is_tuple=True)
-        frnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-        brnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-        # outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
-        outputs,_=tf.nn.bidirectional_dynamic_rnn(frnn,brnn,sink_x,sink_lenth_x,dtype=tf.float32)
-        sink_x_shape = tf.shape(sink_x)
-        batch_s, max_timesteps = sink_x_shape[0], sink_x_shape[1]
-        outputs = tf.reshape(outputs, [-1, num_hidden])
-        W = tf.Variable(tf.truncated_normal([num_hidden, num_classes], stddev=0.1))
-        b = tf.Variable(tf.constant(0., shape=[num_classes]))
-        logits = tf.transpose(tf.reshape(tf.matmul(outputs, W) + b, [batch_s, -1, num_classes]), (1, 0, 2))
-
-        cost = tf.reduce_mean(tf.nn.ctc_loss(sink_y, logits, sink_lenth_x))
-        optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
-        decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_x)
-
-        ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32), sink_y))
-        return sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph
-
-def biLstmCtcGraph():
-    num_hidden = 130
-    initial_learning_rate = 1e-2
+def biLstmCnnCtcGraph():
+    num_hidden = 100
+    initial_learning_rate = 1e-3
 
     graph = tf.Graph()
     with graph.as_default():
         sink_x = tf.placeholder(tf.float32, [None, None, num_features])  # num feature is input length?
+        # afterCnn=[cnn(xx) for xx in sink_x]
+        def process(x):
+            p('processing')
+            return cnn(x)
+
+        # afterCnn=tf.map_fn(process,sink_x)
+        afterCnn=[process(i) for i in sink_x.eval()]
+        afterCnn=np.array(afterCnn)
+
+        p('after cnn ok,shape:'+str(afterCnn.shape))
         sink_lenth_x = tf.placeholder(tf.int32, [None])
         sink_y = tf.sparse_placeholder(tf.int32)  # targets
+        #
+        # cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
+        # stack = tf.contrib.rnn.MultiRNNCell(
+        #     [tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)] ,
+        #     state_is_tuple=True)
+        # frnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
+        # brnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
+        # frnn = tf.contrib.rnn.GRUCell(num_hidden)
+        # brnn = tf.contrib.rnn.GRUCell(num_hidden)]
 
-        cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-        stack = tf.contrib.rnn.MultiRNNCell(
-            [tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)] ,
-            state_is_tuple=True)
-        frnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-        brnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
+        frnn=tf.contrib.rnn.MultiRNNCell(
+            [tf.contrib.rnn.GRUCell(num_hidden) for i in [1, 1]])
+        brnn = tf.contrib.rnn.MultiRNNCell(
+            [tf.contrib.rnn.GRUCell(num_hidden) for i in [1, 1]])
+
         # outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
-        outputs,_=tf.nn.bidirectional_dynamic_rnn(frnn,brnn,sink_x,sink_lenth_x,dtype=tf.float32)
+        outputs, _ = tf.nn.bidirectional_dynamic_rnn(frnn, brnn, afterCnn, sink_lenth_x, dtype=tf.float32)
         sink_x_shape = tf.shape(sink_x)
         batch_s, max_timesteps = sink_x_shape[0], sink_x_shape[1]
         outputs = tf.reshape(outputs, [-1, num_hidden])
@@ -197,7 +137,8 @@ def biLstmCtcGraph():
 
         cost = tf.reduce_mean(tf.nn.ctc_loss(sink_y, logits, sink_lenth_x))
         optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
-        decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_x)
+        # decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_x)
+        decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, sink_lenth_x)
 
         ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32), sink_y))
         return sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph
@@ -207,7 +148,7 @@ def train(datalist, valilist):
     num_epochs = 1500
     batch_size = 1
     num_examples = 1
-    sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph = biLstmCtcSlicedGraph()
+    sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph = biLstmCnnCtcGraph()
 
     with tf.Session(graph=graph) as sess:
         tf.global_variables_initializer().run()

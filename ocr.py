@@ -12,7 +12,7 @@ from utils import sparse_tuple_from as sparse_tuple_from
 from scipy import misc
 import string
 import random
-
+import cv2
 
 def p(x): print(x)
 
@@ -44,12 +44,17 @@ def img2tensor(imageNdarr_imread, labelStr):
     imgHeight_ = num_features
     imgWidth_ = int(round(rawW_ * (imgHeight_ / rawH_)))
     imgResized = misc.imresize(imgRaw_, (imgWidth_, imgHeight_))
+    imgResized=cv2.threshold(imgResized, 210, 255, cv2.THRESH_BINARY)[1]
+    # plt.imshow(imgResized)
+    # plt.show()
+
     transposedImgNdarr = np.asarray(imgResized[np.newaxis, :])
     normalizedImgNdarr = (transposedImgNdarr - np.mean(transposedImgNdarr)) / np.std(transposedImgNdarr)
     p(labelStr)
     label_dense = np.asarray([characterListInUsage.index(x) for x in labelStr])
     p('normalizedImgNdarr')
     p(normalizedImgNdarr.shape)
+
     # len(normalizedImgNdarr[0][0]) == num features =11
     # len(normalizedImgNdarr[0]) == img width
     # p(len(normalizedImgNdarr[0]))
@@ -68,21 +73,21 @@ def biLstmCtcGraph():
         sink_y = tf.sparse_placeholder(tf.int32)  # targets
         #
         # cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-        # stack = tf.contrib.rnn.MultiRNNCell(
-        #     [tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)] ,
-        #     state_is_tuple=True)
+        stack = tf.contrib.rnn.MultiRNNCell(
+            [tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)] ,
+            state_is_tuple=True)
         # frnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
         # brnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
         # frnn = tf.contrib.rnn.GRUCell(num_hidden)
         # brnn = tf.contrib.rnn.GRUCell(num_hidden)]
 
-        frnn=tf.contrib.rnn.MultiRNNCell(
-            [tf.contrib.rnn.GRUCell(num_hidden) for i in [1, 1]])
-        brnn = tf.contrib.rnn.MultiRNNCell(
-            [tf.contrib.rnn.GRUCell(num_hidden) for i in [1, 1]])
+        # frnn=tf.contrib.rnn.MultiRNNCell(
+        #     [tf.contrib.rnn.GRUCell(num_hidden) for i in [1, 1]])
+        # brnn = tf.contrib.rnn.MultiRNNCell(
+        #     [tf.contrib.rnn.GRUCell(num_hidden) for i in [1, 1]])
 
-        # outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
-        outputs, _ = tf.nn.bidirectional_dynamic_rnn(frnn, brnn, sink_x, sink_lenth_x, dtype=tf.float32)
+        outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
+        # outputs, _ = tf.nn.bidirectional_dynamic_rnn(frnn, brnn, sink_x, sink_lenth_x, dtype=tf.float32)
         sink_x_shape = tf.shape(sink_x)
         batch_s, max_timesteps = sink_x_shape[0], sink_x_shape[1]
         outputs = tf.reshape(outputs, [-1, num_hidden])
@@ -178,9 +183,9 @@ def dir2finalDataList(imgDir):
         if foundLabel[2] == 'ok':
             imgFilename_labelList.append([x + ".png", foundLabel[9].replace('|', ' ')])
     p(imgFilename_labelList)
-
+    # medianBlur
     finalfeedable = [[x[0], x[1], x[2]] for x in
-                     [img2tensor(misc.imread(imgDir + y[0]), y[1]) for y in imgFilename_labelList]]
+                     [img2tensor(cv2.medianBlur(cv2.threshold(cv2.imread(imgDir + y[0],0), 210, 255, cv2.THRESH_BINARY)[1],5), y[1]) for y in imgFilename_labelList]]
 
     return finalfeedable
 
