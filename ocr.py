@@ -62,7 +62,7 @@ def img2tensor(imageNdarr_imread, labelStr):
 
 
 def biLstmCtcGraph():
-    num_hidden = 200
+    num_hidden = 150
     initial_learning_rate = 1e-3
 
     graph = tf.Graph()
@@ -87,8 +87,9 @@ def biLstmCtcGraph():
         sink_x_shape = tf.shape(sink_x)
         batch_s, max_timesteps = sink_x_shape[0], sink_x_shape[1]
         outputs = tf.reshape(outputs, [-1, num_hidden])
-        W = tf.Variable(tf.truncated_normal([num_hidden, num_classes], stddev=0.1))
-        b = tf.Variable(tf.constant(0., shape=[num_classes]))
+
+        W = tf.Variable(tf.truncated_normal([num_hidden, num_classes], stddev=0.2))
+        b = tf.Variable(tf.constant(0.1, shape=[num_classes]))
         logits = tf.transpose(tf.reshape(tf.matmul(outputs, W) + b, [batch_s, -1, num_classes]), (1, 0, 2))
 
         cost = tf.reduce_mean(tf.nn.ctc_loss(sink_y, logits, sink_lenth_x))
@@ -101,7 +102,7 @@ def biLstmCtcGraph():
 
 
 def train(datalist, valilist):
-    num_epochs = 300
+    num_epochs = 500
     batch_size = 1
     num_examples = 1
     sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph = biLstmCtcGraph()
