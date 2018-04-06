@@ -96,7 +96,8 @@ def biLstmCtcGraph():
         logits = tf.transpose(tf.reshape(tf.matmul(outputs, W) + b, [batch_s, -1, num_classes]), (1, 0, 2))
 
         cost = tf.reduce_mean(tf.nn.ctc_loss(sink_y, logits, sink_lenth_x))
-        optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
+        # optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
+        optimizer = tf.train.RMSPropOptimizer(initial_learning_rate, 0.9).minimize(cost)
         # decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_x)
         decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, sink_lenth_x)
 
