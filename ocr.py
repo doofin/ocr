@@ -93,8 +93,8 @@ def biLstmCtcGraph():
 
         cost = tf.reduce_mean(tf.nn.ctc_loss(sink_y, logits, sink_lenth_x))
         optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
-        decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_x)
-        # decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, sink_lenth_x)
+        # decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_x)
+        decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, sink_lenth_x)
 
         ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32), sink_y))
         return sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph
