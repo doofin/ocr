@@ -62,7 +62,7 @@ def img2tensor(imageNdarr_imread, labelStr):
 
 
 def biLstmCtcGraph():
-    num_hidden = 180
+    num_hidden = 240
     initial_learning_rate = 1e-4
 
     graph = tf.Graph()
@@ -75,7 +75,9 @@ def biLstmCtcGraph():
         # stack = tf.contrib.rnn.MultiRNNCell([
         #     tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)] ,state_is_tuple=True)
 
-        stack = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.GRUCell(num_hidden), tf.contrib.rnn.GRUCell(num_hidden)])
+        stack = tf.contrib.rnn.MultiRNNCell([
+            tf.contrib.rnn.GRUCell(num_hidden)
+            for _ in [1, 1, 1]])
         # stack=tf.contrib.rnn.GRUCell(num_hidden)
 
         outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
