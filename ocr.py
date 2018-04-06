@@ -63,7 +63,7 @@ def img2tensor(imageNdarr_imread, labelStr):
 
 
 def biLstmCtcGraph():
-    num_hidden = 100
+    num_hidden = 120
     initial_learning_rate = 1e-3
 
     graph = tf.Graph()
@@ -78,16 +78,16 @@ def biLstmCtcGraph():
             state_is_tuple=True)
         # frnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
         # brnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-        # frnn = tf.contrib.rnn.GRUCell(num_hidden)
-        # brnn = tf.contrib.rnn.GRUCell(num_hidden)]
+        frnn = tf.contrib.rnn.GRUCell(num_hidden)
+        brnn = tf.contrib.rnn.GRUCell(num_hidden)
 
         # frnn=tf.contrib.rnn.MultiRNNCell(
         #     [tf.contrib.rnn.GRUCell(num_hidden) for i in [1, 1]])
         # brnn = tf.contrib.rnn.MultiRNNCell(
         #     [tf.contrib.rnn.GRUCell(num_hidden) for i in [1, 1]])
 
-        outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
-        # outputs, _ = tf.nn.bidirectional_dynamic_rnn(frnn, brnn, sink_x, sink_lenth_x, dtype=tf.float32)
+        # outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
+        outputs, _ = tf.nn.bidirectional_dynamic_rnn(frnn, brnn, sink_x, sink_lenth_x, dtype=tf.float32)
         sink_x_shape = tf.shape(sink_x)
         batch_s, max_timesteps = sink_x_shape[0], sink_x_shape[1]
         outputs = tf.reshape(outputs, [-1, num_hidden])
@@ -111,7 +111,7 @@ def train(datalist, valilist):
     sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph = biLstmCtcGraph()
 
     with tf.Session(graph=graph) as sess:
-        writer = tf.summary.FileWriter("/tmp/tflog", sess.graph)
+        # writer = tf.summary.FileWriter("/tmp/tflog", sess.graph)
         tf.global_variables_initializer().run()
         vald = valilist[0]
         # vald=datalist[0]
@@ -157,7 +157,7 @@ def train(datalist, valilist):
             if ler_accum < 0.01:
                 break
 
-    writer.close()
+    # writer.close()
 
 
 import os
