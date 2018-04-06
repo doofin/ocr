@@ -32,7 +32,6 @@ valiDir = "validata/"
 num_features = 12  # bigger -> worse!
 num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
 
-imgct = 0
 
 
 def img2tensor(imageNdarr_imread, labelStr):
@@ -63,7 +62,7 @@ def img2tensor(imageNdarr_imread, labelStr):
 
 
 def biLstmCtcGraph():
-    num_hidden = 120
+    num_hidden = 200
     initial_learning_rate = 1e-3
 
     graph = tf.Graph()
@@ -73,21 +72,18 @@ def biLstmCtcGraph():
         sink_y = tf.sparse_placeholder(tf.int32)  # targets
         #
         # cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-        stack = tf.contrib.rnn.MultiRNNCell(
-            [tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)] ,
-            state_is_tuple=True)
+        # stack = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)] ,state_is_tuple=True)
+        stack=tf.contrib.rnn.GRUCell(num_hidden)
+
+        outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
+
         # frnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
         # brnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-        frnn = tf.contrib.rnn.GRUCell(num_hidden)
-        brnn = tf.contrib.rnn.GRUCell(num_hidden)
 
-        # frnn=tf.contrib.rnn.MultiRNNCell(
-        #     [tf.contrib.rnn.GRUCell(num_hidden) for i in [1, 1]])
-        # brnn = tf.contrib.rnn.MultiRNNCell(
-        #     [tf.contrib.rnn.GRUCell(num_hidden) for i in [1, 1]])
+        # frnn = tf.contrib.rnn.GRUCell(num_hidden)
+        # brnn = tf.contrib.rnn.GRUCell(num_hidden)
+        # outputs, _ = tf.nn.bidirectional_dynamic_rnn(frnn, brnn, sink_x, sink_lenth_x, dtype=tf.float32)
 
-        # outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
-        outputs, _ = tf.nn.bidirectional_dynamic_rnn(frnn, brnn, sink_x, sink_lenth_x, dtype=tf.float32)
         sink_x_shape = tf.shape(sink_x)
         batch_s, max_timesteps = sink_x_shape[0], sink_x_shape[1]
         outputs = tf.reshape(outputs, [-1, num_hidden])
@@ -97,8 +93,8 @@ def biLstmCtcGraph():
 
         cost = tf.reduce_mean(tf.nn.ctc_loss(sink_y, logits, sink_lenth_x))
         optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
-        # decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_x)
-        decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, sink_lenth_x)
+        decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_x)
+        # decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, sink_lenth_x)
 
         ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32), sink_y))
         return sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph
@@ -153,7 +149,8 @@ def train(datalist, valilist):
                 costvalid, lerValid = sess.run([cost, ler], feed_dict=feed2)
                 print('Original:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(vald[2])]))
                 print('Decoded:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(result_sparse)]))
-                p('ler : %s' % lerValid)
+                p('ler : %s' % lerValid )
+                p("'\n\n'")
             if ler_accum < 0.01:
                 break
 
