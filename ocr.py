@@ -77,7 +77,7 @@ def biLstmCtcGraph():
 
         stack = tf.contrib.rnn.MultiRNNCell([
             tf.contrib.rnn.GRUCell(num_hidden)
-            for _ in [1, 1, 1]])
+            for _ in [1, 1, 1, 1, 1]])
         # stack=tf.contrib.rnn.GRUCell(num_hidden)
 
         outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
