@@ -62,7 +62,7 @@ def img2tensor(imageNdarr_imread, labelStr):
 
 
 def biLstmCtcGraph():
-    num_hidden = 240
+    num_hidden = 180
     initial_learning_rate = 1e-4
 
     graph = tf.Graph()
@@ -77,7 +77,7 @@ def biLstmCtcGraph():
 
         stack = tf.contrib.rnn.MultiRNNCell([
             tf.contrib.rnn.GRUCell(num_hidden)
-            for _ in [1, 1, 1, 1, 1]])
+            for _ in [1, 1, 1, 1]])
         # stack=tf.contrib.rnn.GRUCell(num_hidden)
 
         outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
@@ -99,7 +99,7 @@ def biLstmCtcGraph():
 
         cost = tf.reduce_mean(tf.nn.ctc_loss(sink_y, logits, sink_lenth_x))
         # optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
-        optimizer = tf.train.RMSPropOptimizer(initial_learning_rate, 0.9).minimize(cost)
+        optimizer = tf.train.AdamOptimizer(initial_learning_rate, 0.9).minimize(cost)
         # decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_x)
         decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, sink_lenth_x)
 
