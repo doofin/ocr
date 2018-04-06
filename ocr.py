@@ -63,7 +63,7 @@ def img2tensor(imageNdarr_imread, labelStr):
 
 def biLstmCtcGraph():
     num_hidden = 180
-    initial_learning_rate = 1e-3
+    initial_learning_rate = 1e-4
 
     graph = tf.Graph()
     with graph.as_default():
