@@ -14,6 +14,7 @@ import string
 import random
 import cv2
 
+
 def p(x): print(x)
 
 
@@ -33,7 +34,6 @@ num_features = 12  # bigger -> worse!
 num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
 
 
-
 def img2tensor(imageNdarr_imread, labelStr):
     imgRaw_ = imageNdarr_imread.transpose()
     print("raw image")
@@ -43,7 +43,7 @@ def img2tensor(imageNdarr_imread, labelStr):
     imgHeight_ = num_features
     imgWidth_ = int(round(rawW_ * (imgHeight_ / rawH_)))
     imgResized = misc.imresize(imgRaw_, (imgWidth_, imgHeight_))
-    imgResized=cv2.threshold(imgResized, 210, 255, cv2.THRESH_BINARY)[1]
+    imgResized = cv2.threshold(imgResized, 210, 255, cv2.THRESH_BINARY)[1]
     # plt.imshow(imgResized)
     # plt.show()
 
@@ -62,7 +62,7 @@ def img2tensor(imageNdarr_imread, labelStr):
 
 
 def biLstmCtcGraph():
-    num_hidden = 150
+    num_hidden = 180
     initial_learning_rate = 1e-3
 
     graph = tf.Graph()
@@ -72,8 +72,11 @@ def biLstmCtcGraph():
         sink_y = tf.sparse_placeholder(tf.int32)  # targets
         #
         # cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-        # stack = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)] ,state_is_tuple=True)
-        stack=tf.contrib.rnn.GRUCell(num_hidden)
+        # stack = tf.contrib.rnn.MultiRNNCell([
+        #     tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)] ,state_is_tuple=True)
+
+        stack = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.GRUCell(num_hidden), tf.contrib.rnn.GRUCell(num_hidden)])
+        # stack=tf.contrib.rnn.GRUCell(num_hidden)
 
         outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
 
@@ -150,7 +153,7 @@ def train(datalist, valilist):
                 costvalid, lerValid = sess.run([cost, ler], feed_dict=feed2)
                 print('Original:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(vald[2])]))
                 print('Decoded:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(result_sparse)]))
-                p('ler : %s' % lerValid )
+                p('ler : %s' % lerValid)
                 p("'\n\n'")
             if ler_accum < 0.01:
                 break
@@ -183,7 +186,9 @@ def dir2finalDataList(imgDir):
     p(imgFilename_labelList)
     # medianBlur
     finalfeedable = [[x[0], x[1], x[2]] for x in
-                     [img2tensor(cv2.medianBlur(cv2.threshold(cv2.imread(imgDir + y[0],0), 210, 255, cv2.THRESH_BINARY)[1],5), y[1]) for y in imgFilename_labelList]]
+                     [img2tensor(
+                         cv2.medianBlur(cv2.threshold(cv2.imread(imgDir + y[0], 0), 210, 255, cv2.THRESH_BINARY)[1], 5),
+                         y[1]) for y in imgFilename_labelList]]
 
     return finalfeedable
 
