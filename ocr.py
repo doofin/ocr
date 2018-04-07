@@ -190,9 +190,9 @@ def dir2finalDataList(imgDir):
     p("reading...")
     imgNameAndLabel = []
     ct = 0
-    dirfiles=os.listdir(imgDir)
-    for x in list(map(lambda adir: adir.split('.')[0], dirfiles)):
-        foundLabel_line = imageFilename2label(labelFile2list(labelFileName), x)
+    labelfilelist=labelFile2list(labelFileName)
+    for x in list(map(lambda adir: adir.split('.')[0], os.listdir(imgDir))):
+        foundLabel_line = imageFilename2label(labelfilelist, x)
         if foundLabel_line[2] == 'ok':
             a_label = foundLabel_line[9]
             cleaned_label = replaceCharlist(characterExtra, a_label).lower()
