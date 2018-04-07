@@ -1,4 +1,5 @@
-
+wordtrain/
+wordvalid/
 .idea/
 ocrdata/
 moredata/
