@@ -2,6 +2,7 @@
 .idea/
 ocrdata/
 moredata/
+validata/
 
 ### macOS ###
 *.DS_Store

@@ -18,26 +18,30 @@ import cv2
 def p(x): print(x)
 
 
+def joinStr(strList): return ''.join(strList)
+
+
+def replaceCharlist(toReplaceCharList, str): return ''.join([' ' if c in toReplaceCharList else c for c in str])
+
+
 def sparse2dense(x): return x[1]
 
 
 slicedImgWidth = 30
-
-characterListFull = string.ascii_lowercase + string.ascii_uppercase + " .,\n" + string.digits + string.punctuation  # "'!?\"-:()"
-characterListInUsage = characterListFull
-# A|MOVE|to|stop|Mr.|Gaitskell|from
-inputstring = "A MOVE to stop Mr .Gaitskell from."
-inputimageName = "ocrdata/a01-000u-s00-00.png"
-valiDir = "validata/"
-
+characterBasic = string.ascii_lowercase + " " + string.digits
+characterExtra = ".,\n|" + string.punctuation
+characterListInUsage = characterBasic
+characterListForDecoding = characterListInUsage + characterExtra
 num_features = 12  # bigger -> worse!
 num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
+
+valiDir = "validata/"
 
 
 def img2tensor(imageNdarr_imread, labelStr):
     imgRaw_ = imageNdarr_imread.transpose()
-    print("raw image")
-    print(imgRaw_.shape)
+    # print("raw image")
+    # print(imgRaw_.shape)
     rawW_ = imgRaw_.shape[0]
     rawH_ = imgRaw_.shape[1]
     imgHeight_ = num_features
@@ -49,10 +53,10 @@ def img2tensor(imageNdarr_imread, labelStr):
 
     transposedImgNdarr = np.asarray(imgResized[np.newaxis, :])
     normalizedImgNdarr = (transposedImgNdarr - np.mean(transposedImgNdarr)) / np.std(transposedImgNdarr)
-    p(labelStr)
+    # p(labelStr)
     label_dense = np.asarray([characterListInUsage.index(x) for x in labelStr])
-    p('normalizedImgNdarr')
-    p(normalizedImgNdarr.shape)
+    # p('normalizedImgNdarr')
+    # p(normalizedImgNdarr.shape)
 
     # len(normalizedImgNdarr[0][0]) == num features =11
     # len(normalizedImgNdarr[0]) == img width
@@ -155,7 +159,10 @@ def train(datalist, valilist):
                 result_sparse = sess.run(decoded[0], feed_dict=feed2)
                 costvalid, lerValid = sess.run([cost, ler], feed_dict=feed2)
                 print('Original:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(vald[2])]))
-                print('Decoded:\n%s' % ''.join([characterListInUsage[i] for i in sparse2dense(result_sparse)]))
+                print('Decoded:\n%s' % ''.join([characterListInUsage[i]
+                                                if (i<len(characterListInUsage))
+                                                else characterListInUsage[len(characterListInUsage)-1]
+                                                for i in sparse2dense(result_sparse)]))
                 p('ler : %s' % lerValid)
                 p("'\n\n'")
             if ler_accum < 0.01:
@@ -170,8 +177,8 @@ labelFileName = "sentences.txt"
 
 
 def labelFile2list(imageFN):
-    crimefile = open(labelFileName, 'r')
-    return [line.replace('\n', '').split(' ') for line in crimefile.readlines()]
+    labFile = open(labelFileName, 'r')
+    return [line.replace('\n', '').split(' ') for line in labFile.readlines()]
 
 
 def imageFilename2label(list, imageFileName_):
@@ -179,19 +186,25 @@ def imageFilename2label(list, imageFileName_):
 
 
 def dir2finalDataList(imgDir):
-    imgFilename_labelList = []
+    p("reading...")
+    imgNameAndLabel = []
+    ct = 0
     for x in list(map(lambda adir: adir.split('.')[0], os.listdir(imgDir))):
-        interm = imageFilename2label(labelFile2list(labelFileName), x)
-        # p(interm)
-        foundLabel = imageFilename2label(labelFile2list(labelFileName), x)
-        if foundLabel[2] == 'ok':
-            imgFilename_labelList.append([x + ".png", foundLabel[9].replace('|', ' ')])
-    p(imgFilename_labelList)
+        foundLabel_line = imageFilename2label(labelFile2list(labelFileName), x)
+        if foundLabel_line[2] == 'ok':
+            a_label = foundLabel_line[9]
+            cleaned_label = replaceCharlist(characterExtra, a_label).lower()
+            p('reading nth:' + str(ct) + ',,label is : ' + str(cleaned_label))
+            imgNameAndLabel.append([x + ".png", cleaned_label])
+            ct += 1
+
+    p(imgNameAndLabel)
+    p("read complete")
     # medianBlur
     finalfeedable = [[x[0], x[1], x[2]] for x in
                      [img2tensor(
                          cv2.medianBlur(cv2.threshold(cv2.imread(imgDir + y[0], 0), 210, 255, cv2.THRESH_BINARY)[1], 5),
-                         y[1]) for y in imgFilename_labelList]]
+                         y[1]) for y in imgNameAndLabel]]
 
     return finalfeedable
 
