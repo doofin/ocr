@@ -198,7 +198,7 @@ def dir2finalDataList(imgDir):
         # p(foundLabel_line)
         wordcat = foundLabel_line[7]
         a_label = foundLabel_line[8]
-        if ct == 2000: break
+        if ct == 1000: break
         if (foundLabel_line[1] == 'ok') & ((a_label[0] in (string.ascii_lowercase + string.ascii_uppercase))):
             cleaned_label = replaceCharlist(characterExtra, a_label).lower()
             p('reading nth:' + str(ct) + ',,label is : ' + str(cleaned_label) + ',,' + str(foundLabel_line[0]))

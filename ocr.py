@@ -80,9 +80,17 @@ def biLstmCtcGraph():
         # stack = tf.contrib.rnn.MultiRNNCell([
         #     tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)] ,state_is_tuple=True)
 
-        stack = tf.contrib.rnn.MultiRNNCell([
-            tf.contrib.rnn.GRUCell(num_hidden)
-            for _ in [1, 1, 1, 1, 1]])
+        # stack = tf.contrib.rnn.MultiRNNCell([
+        #     tf.contrib.rnn.GRUCell(num_hidden)
+        #     for _ in [1, 1, 1, 1, 1]])
+        tf.nn.rnn_cell.GRUCell(num_hidden)
+        stack = tf.nn.rnn_cell.MultiRNNCell([
+            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_hidden), output_keep_prob=0.5),
+            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_hidden), output_keep_prob=0.5),
+            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_hidden),output_keep_prob=0.6),
+            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_hidden),output_keep_prob=0.6)
+        ])
+
         # stack=tf.contrib.rnn.GRUCell(num_hidden)
 
         outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
