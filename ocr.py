@@ -87,8 +87,8 @@ def biLstmCtcGraph():
         stack = tf.nn.rnn_cell.MultiRNNCell([
             tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_hidden), output_keep_prob=0.5),
             tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_hidden), output_keep_prob=0.5),
-            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_hidden),output_keep_prob=0.6),
-            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_hidden),output_keep_prob=0.6)
+            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_hidden), output_keep_prob=0.6),
+            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_hidden), output_keep_prob=0.6)
         ])
 
         # stack=tf.contrib.rnn.GRUCell(num_hidden)
@@ -130,7 +130,7 @@ def train(datalist, valilist):
     with tf.Session(graph=graph) as sess:
         # writer = tf.summary.FileWriter("/tmp/tflog", sess.graph)
         tf.global_variables_initializer().run()
-        vald = valilist[0]
+        # vald = valilist[0]
         # vald=datalist[0]
         for curr_epoch in range(num_epochs):
             train_cost = train_ler = 0
@@ -154,29 +154,34 @@ def train(datalist, valilist):
                 train_cost /= num_examples
                 train_ler /= num_examples
 
-                val_cost, val_ler = sess.run([cost, ler], feed_dict=feed)
-                feed2 = {sink_x: vald[0],
-                         sink_lenth_x: vald[1],
-                         sink_y: vald[2]
-                         }
-                result_sparse = sess.run(decoded[0], feed_dict=feed2)
-                costvalid, lerValid = sess.run([cost, ler], feed_dict=feed2)
-
-                if (idx % 2 == 0):
+                # val_cost, val_ler = sess.run([cost, ler], feed_dict=feed)
+                validAvgLer=0
+                if (idx % 5 == 0):
                     print(str(idx) + '/' + str(lenofdatalist) + " of data")
-                    print("Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, accumLer = {:.3f},time = {:.3f}"
-                          .format(curr_epoch + 1, num_epochs, train_cost, train_ler, ler_avg,
-                                  val_cost, val_ler, time.time() - start))
+                    print("Epoch {}/{},train_cost {:.3f}, train_ler {:.3f}, accumLer {:.3f},time = {:.3f}"
+                          .format(curr_epoch + 1, num_epochs, train_cost, train_ler, ler_avg, time.time() - start))
 
-                    if (lerValid < minimalLer): minimalLer = lerValid
                     p(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                    print('Original:\n%s' % joinStr([characterListInUsage[i] for i in sparse2dense(vald[2])]))
-                    print('Decoded:\n%s' % joinStr([characterListInUsage[i]
-                                                    if (i < len(characterListInUsage))
-                                                    else characterListInUsage[len(characterListInUsage) - 1]
-                                                    for i in sparse2dense(result_sparse)]))
-                    p('ler : ' + str(lerValid) + ',minimal:' + str(minimalLer))
-                    p("\n\n")
+                    valilistInuse=valilist[:3]
+                    for aValid in valilistInuse:
+                        feed2 = {sink_x: aValid[0],
+                                 sink_lenth_x: aValid[1],
+                                 sink_y: aValid[2]
+                                 }
+                        result_sparse = sess.run(decoded[0], feed_dict=feed2)
+                        costvalid, lerValid = sess.run([cost, ler], feed_dict=feed2)
+
+                        if (lerValid < minimalLer):minimalLer = lerValid
+                        print('Original:\n%s' % joinStr([characterListInUsage[i] for i in sparse2dense(aValid[2])]))
+                        print('Decoded:\n%s' % joinStr([characterListInUsage[i]
+                                                        if (i < len(characterListInUsage))
+                                                        else characterListInUsage[len(characterListInUsage) - 1]
+                                                        for i in sparse2dense(result_sparse)]))
+                        p('ler : ' + str(lerValid) + ',minimal:' + str(minimalLer))
+                        validAvgLer+=lerValid
+                    p('------avg ler:'+str(validAvgLer/len(valilistInuse))+'-------')
+                    validAvgLer=0
+                    p("\n")
     # writer.close()
 
 
@@ -198,7 +203,7 @@ def dir2finalDataList(imgDir):
     p("reading...")
     imgNameAndLabel = []
     ct = 0
-    labelfilelist=labelFile2list(labelFileName)
+    labelfilelist = labelFile2list(labelFileName)
     for x in list(map(lambda adir: adir.split('.')[0], os.listdir(imgDir))):
         foundLabel_line = imageFilename2label(labelfilelist, x)
         if foundLabel_line[2] == 'ok':
