@@ -71,11 +71,11 @@ def sliceImg(imgInParams, cnnWidth):
     res=[x.flatten() for x in slicedNdarr]
     p(np.array([res]).shape)
     return np.array([res])
+
 def cnn(sink_x):
-    # sink_x = tf.placeholder(tf.float32, [slicedImgWidth, num_features])  #
-    input_layer = tf.reshape(sink_x, [-1, 28, 28, 1])
+    # input_layer = tf.reshape(sink_x, [-1, 30, 11, 1])
     conv1 = tf.layers.conv2d(
-        inputs=input_layer,
+        inputs=sink_x,
         filters=32,
         kernel_size=[5, 5],
         padding="same",
@@ -98,14 +98,15 @@ def biLstmCnnCtcGraph():
 
     graph = tf.Graph()
     with graph.as_default():
-        sink_x = tf.placeholder(tf.float32, [None, None, num_features])  # num feature is input length?
+        sink_x = tf.placeholder(tf.float32, [None, 30, num_features])  # num feature is input length?
         # afterCnn=[cnn(xx) for xx in sink_x]
         def process(x):
-            p('processing')
+            p('processinga')
             return cnn(x)
 
         # afterCnn=tf.map_fn(process,sink_x)
-        afterCnn=[process(i) for i in sink_x.eval()]
+        # afterCnn=[process(i) for i in sink_x]
+        afterCnn=tf.map_fn(lambda x:process(x),sink_x)
         afterCnn=np.array(afterCnn)
 
         p('after cnn ok,shape:'+str(afterCnn.shape))
@@ -231,9 +232,9 @@ def mainSingle():
 
 
 def mainf():
-    # datalist = dir2finalDataList("ocrdata/")
-    valilist = dir2finalDataList("validata/")
-    train(valilist, valilist)
+    datalist = dir2finalDataList("ocrdata/")
+    # valilist = dir2finalDataList("validata/")
+    train(datalist, datalist)
 
 mainf()
 # dir2finalDataList("validata/")

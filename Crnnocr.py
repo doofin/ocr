@@ -39,8 +39,7 @@ num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  
 valiDir = "validata/"
 
 
-def img2tensor(imageNdarr_imread, labelStr, fn):
-    p("img2tensor:" + labelStr + ",," + fn)
+def img2tensor(imageNdarr_imread, labelStr):
     imgRaw_ = imageNdarr_imread.transpose()
     # print("raw image")
     # print(imgRaw_.shape)
@@ -66,6 +65,75 @@ def img2tensor(imageNdarr_imread, labelStr, fn):
     # sliceImg(normalizedImgNdarr)
     return normalizedImgNdarr, [normalizedImgNdarr.shape[1]], sparse_tuple_from([label_dense])
 
+# def RNN(X, W, b, L):
+#     n_inputs = 663
+#     n_em = 64
+#     n_steps = 149
+#     n_hidden = 300
+#     n_outputs = 64
+#     n_classes = 155
+#
+#     X = tf.reshape(X, [train_size * n_steps, n_em])
+#     X_in = tf.matmul(X, W['in']) + b['in']
+#     X_in = tf.reshape(X_in, [train_size, n_steps, n_hidden])
+#     X_in_ = tf.transpose(X_in, [1, 0, 2])
+#     X_in_ta = tf.TensorArray(dtype=tf.float32, size=n_steps)
+#     X_in_ta = X_in_ta.unstack(X_in_)
+#
+#     cell = tf.contrib.rnn.LSTMCell(n_hidden)
+#
+#     def loop_fn(time, cell_output, cell_state, loop_state):
+#         emit_output = cell_output  # == None for time == 0
+#         if cell_output is None:  # time == 0
+#             next_cell_state = cell.zero_state(train_size, tf.float32)
+#         else:
+#             next_cell_state = cell_state
+#         elements_finished = (time >= L)
+#         finished = tf.reduce_all(elements_finished)
+#         next_input = tf.cond(finished,
+#                              lambda: tf.zeros([train_size, n_hidden], dtype=tf.float32),
+#                              lambda: X_in_ta.read(time))
+#         next_loop_state = None
+#         return (elements_finished, next_input, next_cell_state,
+#                 emit_output, next_loop_state)
+#
+#     outputs_ta, final_state, _ = tf.nn.raw_rnn(cell, loop_fn)
+#     outputs = outputs_ta.stack()
+#
+#     outputs = tf.transpose(outputs, [1, 0, 2])
+#     outputs = tf.reshape(outputs, [-1, n_hidden])
+#     outputs_ = tf.matmul(outputs, W['out']) + b['out']
+#
+#     return outputs_
+
+def crnn(inputs, inputs_sequence_length):
+    batch_size = 1
+    numOfHidden=100
+    # inputs = tf.placeholder(shape=(max_time, batch_size, input_depth),
+    #                         dtype=tf.float32)
+    # sequence_length = tf.placeholder(shape=(batch_size,), dtype=tf.int32)
+    cell = tf.contrib.rnn.LSTMCell(numOfHidden)
+    inputs_ta = tf.TensorArray(dtype=tf.float32).unstack(inputs)
+
+    def loop_fn(time, cell_output, cell_state, loop_state):
+        emit_output = cell_output  # == None for time == 0
+        if cell_output is None:  # time == 0
+            next_cell_state = cell.zero_state(batch_size, tf.float32)
+        else:
+            next_cell_state = cell_state
+        elements_finished = (time >= inputs_sequence_length)
+        finished = tf.reduce_all(elements_finished)
+        next_input = tf.cond(
+            finished,
+            lambda: tf.zeros([batch_size, numOfHidden], dtype=tf.float32),
+            lambda: inputs_ta.read(time))
+        next_loop_state = None
+        return (elements_finished, next_input, next_cell_state,
+                emit_output, next_loop_state)
+
+    outputs_ta, final_state, _ = tf.nn.raw_rnn(cell, loop_fn)
+    return outputs_ta.stack()
+
 
 def biLstmCtcGraph():
     num_hidden = 200
@@ -84,16 +152,17 @@ def biLstmCtcGraph():
         # stack = tf.contrib.rnn.MultiRNNCell([
         #     tf.contrib.rnn.GRUCell(num_hidden)
         #     for _ in [1, 1, 1, 1, 1]])
-        tf.nn.rnn_cell.GRUCell(num_hidden)
         stack = tf.nn.rnn_cell.MultiRNNCell([
-            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_hidden), output_keep_prob=prob)
-            for prob in [0.5, 0.6, 0.7, 0.8]
+            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_hidden), output_keep_prob=0.5),
+            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_hidden), output_keep_prob=0.5),
+            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_hidden), output_keep_prob=0.6),
+            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_hidden), output_keep_prob=0.6)
         ])
 
         # stack=tf.contrib.rnn.GRUCell(num_hidden)
 
-        outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
-
+        # outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
+        outputs = crnn(sink_x,sink_lenth_x)
         # frnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
         # brnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
 
@@ -200,7 +269,7 @@ def imageFilename2label(list, imageFileName_):
 
 def dir2finalDataList(imgDir):
     p("reading...")
-    imgNameAndLabel = []  # [(imgname,label)]
+    imgNameAndLabel = []
     ct = 0
     labelfilelist = labelFile2list(labelFileName)
     for x in list(map(lambda adir: adir.split('.')[0], os.listdir(imgDir))):
@@ -218,9 +287,7 @@ def dir2finalDataList(imgDir):
     finalfeedable = [[x[0], x[1], x[2]] for x in
                      [img2tensor(
                          cv2.medianBlur(cv2.threshold(cv2.imread(imgDir + y[0], 0), 210, 255, cv2.THRESH_BINARY)[1], 5),
-                         y[1],
-                         y[0]
-                     ) for y in imgNameAndLabel]]
+                         y[1]) for y in imgNameAndLabel]]
 
     return finalfeedable
 
