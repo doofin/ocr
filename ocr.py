@@ -28,6 +28,7 @@ def replaceCharlist(toReplaceCharList, str): return ''.join([' ' if c in toRepla
 def sparse2dense(x): return x[1]
 
 
+starttime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 slicedImgWidth = 30
 characterBasic = string.ascii_lowercase + " " + string.digits
 characterExtra = ".,\n|" + string.punctuation
@@ -64,6 +65,7 @@ def img2tensor(imageNdarr_imread, labelStr, fn):
     # len(normalizedImgNdarr[0]) == img width
     # p(len(normalizedImgNdarr[0]))
     # sliceImg(normalizedImgNdarr)
+
     return normalizedImgNdarr, [normalizedImgNdarr.shape[1]], sparse_tuple_from([label_dense])
 
 
@@ -76,6 +78,7 @@ def biLstmCtcGraph():
         sink_x = tf.placeholder(tf.float32, [None, None, num_features])  # num feature is input length?
         sink_lenth_x = tf.placeholder(tf.int32, [None])
         sink_y = tf.sparse_placeholder(tf.int32)  # targets
+
         #
         # cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
         # stack = tf.contrib.rnn.MultiRNNCell([
@@ -86,8 +89,9 @@ def biLstmCtcGraph():
         #     for _ in [1, 1, 1, 1, 1]])
         tf.nn.rnn_cell.GRUCell(num_hidden)
         stack = tf.nn.rnn_cell.MultiRNNCell([
-            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_hidden), output_keep_prob=prob)
-            for prob in [0.5, 0.6, 0.7, 0.8]
+            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.LSTMCell(num_units=prob_numHidden[1], use_peepholes=True),
+                                          output_keep_prob=prob_numHidden[0])
+            for prob_numHidden in [[0.5, 400], [0.6, 300], [0.8, 200], [0.8, 200]]
         ])
 
         # stack=tf.contrib.rnn.GRUCell(num_hidden)
@@ -113,19 +117,20 @@ def biLstmCtcGraph():
         # optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
         optimizer = tf.train.AdamOptimizer(initial_learning_rate, 0.9).minimize(cost)
         # decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_x)
-        decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, sink_lenth_x)
+        source_y_decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, sink_lenth_x)
 
-        ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32), sink_y))
-        return sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph
+        ler = tf.reduce_mean(tf.edit_distance(tf.cast(source_y_decoded[0], tf.int32), sink_y))
+        saver = tf.train.Saver()
+        return sink_x, sink_lenth_x, sink_y, source_y_decoded, cost, optimizer, ler, graph, saver
 
 
 def train(datalist, valilist):
     num_epochs = 500
     batch_size = 1
     num_examples = 1
-    sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph = biLstmCtcGraph()
+    sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph, saver = biLstmCtcGraph()
     minimalLer = 1
-
+    # saver = tf.train.Saver()
     with tf.Session(graph=graph) as sess:
         # writer = tf.summary.FileWriter("/tmp/tflog", sess.graph)
         tf.global_variables_initializer().run()
@@ -160,7 +165,7 @@ def train(datalist, valilist):
                     print("Epoch {}/{},train_cost {:.3f}, train_ler {:.3f}, accumLer {:.3f},time = {:.3f}"
                           .format(curr_epoch + 1, num_epochs, train_cost, train_ler, ler_avg, time.time() - start))
 
-                    p(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                    p(starttime + ' ----> ' + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                     valilistInuse = valilist[:3]
                     for aValid in valilistInuse:
                         feed2 = {sink_x: aValid[0],
@@ -168,9 +173,13 @@ def train(datalist, valilist):
                                  sink_y: aValid[2]
                                  }
                         result_sparse = sess.run(decoded[0], feed_dict=feed2)
-                        costvalid, lerValid = sess.run([cost, ler], feed_dict=feed2)
+                        _, lerValid = sess.run([cost, ler], feed_dict=feed2)
 
-                        if (lerValid < minimalLer): minimalLer = lerValid
+                        if (lerValid < minimalLer):
+                            minimalLer = lerValid
+                            if (lerValid < 0.7):
+                                p("saving model....")
+                                saver.save(sess, "saved/model-" + str(lerValid) + ".ckpt")
                         print('Original:\n%s' % joinStr([characterListInUsage[i] for i in sparse2dense(aValid[2])]))
                         print('Decoded:\n%s' % joinStr([characterListInUsage[i]
                                                         if (i < len(characterListInUsage))
@@ -178,7 +187,8 @@ def train(datalist, valilist):
                                                         for i in sparse2dense(result_sparse)]))
                         p('ler : ' + str(lerValid) + ',minimal:' + str(minimalLer))
                         validAvgLer += lerValid
-                    p('------avg ler:' + str(validAvgLer / len(valilistInuse)) + '-------')
+                        avgValidLer = validAvgLer / len(valilistInuse)
+                    p('------avg ler:' + str(avgValidLer) + '-------')
                     validAvgLer = 0
                     p("\n")
     # writer.close()
@@ -232,8 +242,11 @@ def mainSingle():
     train([[x1, y1, y1len]])
 
 
+traindata = "ocrdata/"
+
+
 def mainf():
-    datalist = dir2finalDataList("ocrdata/")
+    datalist = dir2finalDataList(traindata)
     valilist = dir2finalDataList("validata/")
     train(datalist, valilist)
 
