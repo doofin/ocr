@@ -15,7 +15,7 @@ import random
 import cv2
 import datetime
 
-
+isValidating=True
 def p(x): print(x)
 
 
@@ -69,7 +69,7 @@ def img2tensor(imageNdarr_imread, labelStr, fn):
     return normalizedImgNdarr, [normalizedImgNdarr.shape[1]], sparse_tuple_from([label_dense])
 
 
-def biLstmCtcGraph():
+def biLstmCtcGraph(is_validating):
     num_hidden = 200
     initial_learning_rate = 1e-4
 
@@ -87,7 +87,8 @@ def biLstmCtcGraph():
         # stack = tf.contrib.rnn.MultiRNNCell([
         #     tf.contrib.rnn.GRUCell(num_hidden)
         #     for _ in [1, 1, 1, 1, 1]])
-        tf.nn.rnn_cell.GRUCell(num_hidden)
+        # tf.nn.rnn_cell.GRUCell(num_hidden)
+        cellInUse=tf.nn.rnn_cell.LSTMCell(num_units=prob_numHidden[1], use_peepholes=True) if is_validating else
         stack = tf.nn.rnn_cell.MultiRNNCell([
             tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.LSTMCell(num_units=prob_numHidden[1], use_peepholes=True),
                                           output_keep_prob=prob_numHidden[0])
