@@ -15,7 +15,9 @@ import random
 import cv2
 import datetime
 
-isValidating=True
+isValidating = True
+
+
 def p(x): print(x)
 
 
@@ -79,7 +81,6 @@ def biLstmCtcGraph(is_validating):
         sink_lenth_x = tf.placeholder(tf.int32, [None])
         sink_y = tf.sparse_placeholder(tf.int32)  # targets
 
-        #
         # cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
         # stack = tf.contrib.rnn.MultiRNNCell([
         #     tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)] ,state_is_tuple=True)
@@ -88,12 +89,16 @@ def biLstmCtcGraph(is_validating):
         #     tf.contrib.rnn.GRUCell(num_hidden)
         #     for _ in [1, 1, 1, 1, 1]])
         # tf.nn.rnn_cell.GRUCell(num_hidden)
-        cellInUse=tf.nn.rnn_cell.LSTMCell(num_units=prob_numHidden[1], use_peepholes=True) if is_validating else
-        stack = tf.nn.rnn_cell.MultiRNNCell([
+        stackTrain = tf.nn.rnn_cell.MultiRNNCell([
             tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.LSTMCell(num_units=prob_numHidden[1], use_peepholes=True),
                                           output_keep_prob=prob_numHidden[0])
             for prob_numHidden in [[0.5, 400], [0.6, 300], [0.8, 200], [0.8, 200]]
         ])
+        stackValid = tf.nn.rnn_cell.MultiRNNCell([
+            tf.nn.rnn_cell.LSTMCell(num_units=prob_numHidden[1], use_peepholes=True)
+            for prob_numHidden in [[0.5, 400], [0.6, 300], [0.8, 200], [0.8, 200]]
+        ])
+        stack = stackValid if is_validating else stackTrain
 
         # stack=tf.contrib.rnn.GRUCell(num_hidden)
 
@@ -195,6 +200,28 @@ def train(datalist, valilist):
     # writer.close()
 
 
+def validate(valilist):
+    sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph, saver = biLstmCtcGraph(True)
+    with tf.Session(graph=graph) as sess:
+        # tf.global_variables_initializer().run()
+        saver.restore(sess, "saved/model-0.18421052.ckpt")
+        minimalLer = 1
+        for aValid in valilist:
+            result_sparse, lerValid = sess.run([decoded[0], ler], feed_dict={sink_x: aValid[0],
+                                                                             sink_lenth_x: aValid[1],
+                                                                             sink_y: aValid[2]})
+            print('Original:\n%s' % joinStr([characterListInUsage[i] for i in sparse2dense(aValid[2])]))
+            print('Decoded:\n%s' % joinStr([characterListInUsage[i]
+                                            if (i < len(characterListInUsage))
+                                            else characterListInUsage[len(characterListInUsage) - 1]
+                                            for i in sparse2dense(result_sparse)]))
+            p('ler : ' + str(lerValid) + ',minimal:' + str(minimalLer))
+            validAvgLer = 0
+            validAvgLer += lerValid
+            avgValidLer = validAvgLer / len(valilist)
+        p('------avg ler:' + str(avgValidLer) + '-------')
+
+
 import os
 
 labelFileName = "sentences.txt"
@@ -252,5 +279,10 @@ def mainf():
     train(datalist, valilist)
 
 
-mainf()
+def mainValid():
+    validate(dir2finalDataList("validata/"))
+
+
+mainValid()
+# mainf()
 # dir2finalDataList("validata/")
