@@ -6,6 +6,7 @@ ocrdata/
 moredata/
 validata/
 
+.~lock*
 ### macOS ###
 *.DS_Store
 .AppleDouble
