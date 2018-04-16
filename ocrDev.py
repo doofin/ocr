@@ -4,7 +4,6 @@ from __future__ import print_function
 
 import time
 import tensorflow as tf
-import matplotlib.pyplot as plt
 
 import numpy as np
 from six.moves import xrange as range
@@ -17,6 +16,7 @@ import datetime
 
 isValidating = True
 modelLabel = "dev"
+savedir = "saved" + modelLabel
 
 
 def p(x): print(x)
@@ -93,8 +93,7 @@ def biLstmCtcGraph(is_validating):
         # tf.nn.rnn_cell.GRUCell(num_hidden)
         # cellInUse=tf.nn.rnn_cell.LSTMCell(num_units=prob_numHidden[1], use_peepholes=True) if is_validating else
         stack = tf.nn.rnn_cell.MultiRNNCell([
-            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.LSTMCell(num_units=prob_numHidden[1], use_peepholes=True),
-                                          output_keep_prob=prob_numHidden[0])
+            tf.nn.rnn_cell.GRUCell(num_units=prob_numHidden[1])
             for prob_numHidden in [[0.5, 500], [0.5, 400], [0.6, 300], [0.8, 200], [0.9, 200]]
         ])  #
 
@@ -183,7 +182,7 @@ def train(datalist, valilist):
                             minimalLer = lerValid
                             if (lerValid < 0.7):
                                 p("saving model....")
-                                saver.save(sess, "saved/model-" + modelLabel + str(lerValid) + ".ckpt")
+                                saver.save(sess, savedir+"/model-" + modelLabel + str(lerValid) + ".ckpt")
                         print('Original:\n%s' % joinStr([characterListInUsage[i] for i in sparse2dense(aValid[2])]))
                         print('Decoded:\n%s' % joinStr([characterListInUsage[i]
                                                         if (i < len(characterListInUsage))

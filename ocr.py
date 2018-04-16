@@ -165,7 +165,7 @@ def train(datalist, valilist):
                 train_ler /= num_examples
 
                 # val_cost, val_ler = sess.run([cost, ler], feed_dict=feed)
-                validAvgLer = 0
+                validAvgLerTotal = 0
                 if (idx % 5 == 0):
                     print(str(idx) + '/' + str(lenofdatalist) + " of data")
                     print("Epoch {}/{},train_cost {:.3f}, train_ler {:.3f}, accumLer {:.3f},time = {:.3f}"
@@ -192,10 +192,10 @@ def train(datalist, valilist):
                                                         else characterListInUsage[len(characterListInUsage) - 1]
                                                         for i in sparse2dense(result_sparse)]))
                         p('ler : ' + str(lerValid) + ',minimal:' + str(minimalLer))
-                        validAvgLer += lerValid
-                        avgValidLer = validAvgLer / len(valilistInuse)
+                        validAvgLerTotal += lerValid
+                        avgValidLer = validAvgLerTotal / len(valilistInuse)
                     p('------avg ler:' + str(avgValidLer) + '-------')
-                    validAvgLer = 0
+                    validAvgLerTotal = 0
                     p("\n")
     # writer.close()
 
@@ -206,6 +206,7 @@ def validate(valilist):
         # tf.global_variables_initializer().run()
         saver.restore(sess, "saved/model-0.18421052.ckpt")
         minimalLer = 1
+        validAvgLerAccum = 0
         for aValid in valilist:
             result_sparse, lerValid = sess.run([decoded[0], ler], feed_dict={sink_x: aValid[0],
                                                                              sink_lenth_x: aValid[1],
@@ -216,9 +217,9 @@ def validate(valilist):
                                             else characterListInUsage[len(characterListInUsage) - 1]
                                             for i in sparse2dense(result_sparse)]))
             p('ler : ' + str(lerValid) + ',minimal:' + str(minimalLer))
-            validAvgLer = 0
-            validAvgLer += lerValid
-            avgValidLer = validAvgLer / len(valilist)
+
+            validAvgLerAccum += lerValid
+            avgValidLer = validAvgLerAccum / len(valilist)
         p('------avg ler:' + str(avgValidLer) + '-------')
 
 
@@ -280,7 +281,7 @@ def mainf():
 
 
 def mainValid():
-    validate(dir2finalDataList("validata/"))
+    validate(dir2finalDataList("moredata/"))
 
 
 mainValid()
