@@ -45,7 +45,7 @@ valiDir = "validata/"
 
 
 def img2tensor(imgreaded, labelStr, fn):
-    # p("img2tensor:" + labelStr + ",," + fn)
+    p("img2tensor:" + labelStr + ",," + fn)
 
     imageNdarr_imread = cv2.medianBlur(cv2.threshold(imgreaded, 210, 255, cv2.THRESH_BINARY)[1], 5)
     # imageNdarr_imread = cv2.threshold(imgreaded, 210, 255, cv2.THRESH_BINARY)[1]
@@ -243,7 +243,7 @@ def dir2finalDataList(imgDir):
         if foundLabel_line[2] == 'ok':
             a_label = foundLabel_line[9]
             cleaned_label = replaceCharlist(characterExtra, a_label).lower()
-            # p('reading nth:' + str(ct) + ',,label is : ' + str(cleaned_label))
+            p('reading nth:' + str(ct) + ',,label is : ' + str(cleaned_label))
             imgNameAndLabel.append([x + ".png", cleaned_label])
             ct += 1
 
