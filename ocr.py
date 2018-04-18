@@ -281,7 +281,14 @@ def mainf():
 
 
 def mainValid():
-    validate(dir2finalDataList("moredata/"))
+    for m in ["model-dev0.13157895.ckpt",
+              "model-dev0.078947365.ckpt",
+              "model-dev0.05263158.ckpt",
+              "model-dev0.02631579.ckpt",
+              "model-dev0.0.ckpt"]:
+        p("===============> using model:::::" + m + " <---------------------------------------")
+        r = validate(dir2finalDataList("validata/"), "saveddev/" + m)
+
 
 
 mainValid()

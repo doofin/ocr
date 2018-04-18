@@ -44,7 +44,7 @@ valiDir = "validata/"
 
 
 def img2tensor(imageNdarr_imread, labelStr, fn):
-    p("img2tensor:" + labelStr + ",," + fn)
+    # p("img2tensor:" + labelStr + ",," + fn)
     imgRaw_ = imageNdarr_imread.transpose()
     # print("raw image")
     # print(imgRaw_.shape)
@@ -182,7 +182,7 @@ def train(datalist, valilist):
                             minimalLer = lerValid
                             if (lerValid < 0.7):
                                 p("saving model....")
-                                saver.save(sess, savedir+"/model-" + modelLabel + str(lerValid) + ".ckpt")
+                                saver.save(sess, savedir + "/model-" + modelLabel + str(lerValid) + ".ckpt")
                         print('Original:\n%s' % joinStr([characterListInUsage[i] for i in sparse2dense(aValid[2])]))
                         print('Decoded:\n%s' % joinStr([characterListInUsage[i]
                                                         if (i < len(characterListInUsage))
@@ -221,7 +221,7 @@ def dir2finalDataList(imgDir):
         if foundLabel_line[2] == 'ok':
             a_label = foundLabel_line[9]
             cleaned_label = replaceCharlist(characterExtra, a_label).lower()
-            p('reading nth:' + str(ct) + ',,label is : ' + str(cleaned_label))
+            # p('reading nth:' + str(ct) + ',,label is : ' + str(cleaned_label))
             imgNameAndLabel.append([x + ".png", cleaned_label])
             ct += 1
 
@@ -236,6 +236,30 @@ def dir2finalDataList(imgDir):
                      ) for y in imgNameAndLabel]]
 
     return finalfeedable
+
+
+def validate(valilist, savedmodel):
+    sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph, saver = biLstmCtcGraph(True)
+    with tf.Session(graph=graph) as sess:
+        # tf.global_variables_initializer().run()
+        saver.restore(sess, savedmodel)
+        minimalLer = 1
+        validAvgLerAccum = 0
+        for aValid in valilist:
+            result_sparse, lerValid = sess.run([decoded[0], ler], feed_dict={sink_x: aValid[0],
+                                                                             sink_lenth_x: aValid[1],
+                                                                             sink_y: aValid[2]})
+            print('Original:\n%s' % joinStr([characterListInUsage[i] for i in sparse2dense(aValid[2])]))
+            print('Decoded:\n%s' % joinStr([characterListInUsage[i]
+                                            if (i < len(characterListInUsage))
+                                            else characterListInUsage[len(characterListInUsage) - 1]
+                                            for i in sparse2dense(result_sparse)]))
+            p('ler : ' + str(lerValid) + ',minimal:' + str(minimalLer))
+
+            validAvgLerAccum += lerValid
+            avgValidLer = validAvgLerAccum / len(valilist)
+        p('------avg ler:' + str(avgValidLer) + '-------')
+        return avgValidLer
 
 
 def mainSingle():
@@ -254,5 +278,15 @@ def mainf():
     train(datalist, valilist)
 
 
-mainf()
+avgErrlist = []
+for m in ["model-dev0.13157895.ckpt",
+          "model-dev0.078947365.ckpt",
+          "model-dev0.05263158.ckpt",
+          "model-dev0.02631579.ckpt",
+          "model-dev0.0.ckpt"]:
+    p("===============> using model:::::" + m + " <---------------------------------------")
+    r = validate(dir2finalDataList("validata/"), "saveddev/" + m)
+    avgErrlist.append(str(r))
+
+map(p, avgErrlist)
 # dir2finalDataList("validata/")
