@@ -13,6 +13,7 @@ import string
 import random
 import cv2
 import datetime
+import matplotlib.pyplot as plt
 
 isValidating = True
 modelLabel = "dev"
@@ -37,28 +38,33 @@ characterBasic = string.ascii_lowercase + " " + string.digits
 characterExtra = ".,\n|" + string.punctuation
 characterListInUsage = characterBasic
 characterListForDecoding = characterListInUsage + characterExtra
-num_features = 10  # bigger -> worse!
+num_width = 30  # bigger -> worse!
 num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
 
 valiDir = "validata/"
 
 
-def img2tensor(imageNdarr_imread, labelStr, fn):
+def img2tensor(imgreaded, labelStr, fn):
     # p("img2tensor:" + labelStr + ",," + fn)
+
+    imageNdarr_imread = cv2.medianBlur(cv2.threshold(imgreaded, 210, 255, cv2.THRESH_BINARY)[1], 5)
+    # imageNdarr_imread = cv2.threshold(imgreaded, 210, 255, cv2.THRESH_BINARY)[1]
+    # imageNdarr_imread=imgreaded
     imgRaw_ = imageNdarr_imread.transpose()
     # print("raw image")
     # print(imgRaw_.shape)
     rawW_ = imgRaw_.shape[0]
     rawH_ = imgRaw_.shape[1]
-    imgHeight_ = num_features
+    imgHeight_ = num_width
     imgWidth_ = int(round(rawW_ * (imgHeight_ / rawH_)))
     imgResized = misc.imresize(imgRaw_, (imgWidth_, imgHeight_))
-    imgResized = cv2.threshold(imgResized, 210, 255, cv2.THRESH_BINARY)[1]
+    # imgResized = cv2.threshold(imgResized, 210, 255, cv2.THRESH_BINARY)[1]
     # plt.imshow(imgResized)
     # plt.show()
 
     transposedImgNdarr = np.asarray(imgResized[np.newaxis, :])
     normalizedImgNdarr = (transposedImgNdarr - np.mean(transposedImgNdarr)) / np.std(transposedImgNdarr)
+
     # p(labelStr)
     label_dense = np.asarray([characterListInUsage.index(x) for x in labelStr])
     # p('normalizedImgNdarr')
@@ -78,7 +84,7 @@ def biLstmCtcGraph(is_validating):
 
     graph = tf.Graph()
     with graph.as_default():
-        sink_x = tf.placeholder(tf.float32, [None, None, num_features])  # num feature is input length?
+        sink_x = tf.placeholder(tf.float32, [None, None, num_width])  # num feature is input length?
         sink_lenth_x = tf.placeholder(tf.int32, [None])
         sink_y = tf.sparse_placeholder(tf.int32)  # targets
 
@@ -92,10 +98,21 @@ def biLstmCtcGraph(is_validating):
         #     for _ in [1, 1, 1, 1, 1]])
         # tf.nn.rnn_cell.GRUCell(num_hidden)
         # cellInUse=tf.nn.rnn_cell.LSTMCell(num_units=prob_numHidden[1], use_peepholes=True) if is_validating else
-        stack = tf.nn.rnn_cell.MultiRNNCell([
-            tf.nn.rnn_cell.GRUCell(num_units=prob_numHidden[1])
-            for prob_numHidden in [[0.5, 500], [0.5, 400], [0.6, 300], [0.8, 200], [0.9, 200]]
-        ])  #
+        stackTrain = tf.nn.rnn_cell.MultiRNNCell([
+            tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.GRUCell(num_units=prob_numHidden[1]),
+                                          output_keep_prob=prob_numHidden[0])
+            for prob_numHidden in [[0.6, 400], [0.7, 300], [0.8, 200], [0.9, 200]]
+        ])
+        stackValid = tf.nn.rnn_cell.MultiRNNCell([
+            tf.nn.rnn_cell.LSTMCell(num_units=prob_numHidden[1], use_peepholes=True)
+            for prob_numHidden in [[0.5, 400], [0.6, 300], [0.8, 200], [0.8, 200]]
+        ])
+        stack = stackValid if is_validating else stackTrain
+
+        # stack = tf.nn.rnn_cell.MultiRNNCell([
+        #     tf.nn.rnn_cell.GRUCell(num_units=prob_numHidden[1])
+        #     for prob_numHidden in [[0.5, 500], [0.5, 400], [0.6, 300], [0.8, 200], [0.9, 200]]
+        # ])  #
 
         # stack=tf.contrib.rnn.GRUCell(num_hidden)
 
@@ -162,7 +179,7 @@ def train(datalist, valilist):
                 train_ler /= num_examples
 
                 # val_cost, val_ler = sess.run([cost, ler], feed_dict=feed)
-                validAvgLer = 0
+                validAccumLer = 0
                 if (idx % 5 == 0):
                     print(str(idx) + '/' + str(lenofdatalist) + " of data")
                     print("Epoch {}/{},train_cost {:.3f}, train_ler {:.3f}, accumLer {:.3f},time = {:.3f}"
@@ -170,6 +187,7 @@ def train(datalist, valilist):
 
                     p(starttime + ' ----> ' + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                     valilistInuse = valilist[:3]
+                    validAvgLer = 0
                     for aValid in valilistInuse:
                         feed2 = {sink_x: aValid[0],
                                  sink_lenth_x: aValid[1],
@@ -178,20 +196,24 @@ def train(datalist, valilist):
                         result_sparse = sess.run(decoded[0], feed_dict=feed2)
                         _, lerValid = sess.run([cost, ler], feed_dict=feed2)
 
-                        if (lerValid < minimalLer):
-                            minimalLer = lerValid
-                            if (lerValid < 0.7):
-                                p("saving model....")
-                                saver.save(sess, savedir + "/model-" + modelLabel + str(lerValid) + ".ckpt")
                         print('Original:\n%s' % joinStr([characterListInUsage[i] for i in sparse2dense(aValid[2])]))
                         print('Decoded:\n%s' % joinStr([characterListInUsage[i]
                                                         if (i < len(characterListInUsage))
                                                         else characterListInUsage[len(characterListInUsage) - 1]
                                                         for i in sparse2dense(result_sparse)]))
                         p('ler : ' + str(lerValid) + ',minimal:' + str(minimalLer))
-                        validAvgLer += lerValid
-                        avgValidLer = validAvgLer / len(valilistInuse)
+                        validAccumLer += lerValid
+                        avgValidLer = validAccumLer / len(valilistInuse)
+                        validAvgLer = avgValidLer
+
                     p('------avg ler:' + str(avgValidLer) + '-------')
+                    if (validAvgLer < minimalLer):
+                        minimalLer = lerValid
+                        if (lerValid < 0.7):
+                            p("saving model....,avg ler:" + str(validAvgLer) + ",, minimal : " + str(minimalLer))
+                            saver.save(sess, savedir + "/model-" + modelLabel + str(lerValid) + ".ckpt")
+
+                    validAccumLer = 0
                     validAvgLer = 0
                     p("\n")
     # writer.close()
@@ -230,7 +252,7 @@ def dir2finalDataList(imgDir):
     # medianBlur
     finalfeedable = [[x[0], x[1], x[2]] for x in
                      [img2tensor(
-                         cv2.medianBlur(cv2.threshold(cv2.imread(imgDir + y[0], 0), 210, 255, cv2.THRESH_BINARY)[1], 5),
+                         cv2.imread(imgDir + y[0], 0),
                          y[1],
                          y[0]
                      ) for y in imgNameAndLabel]]
@@ -262,31 +284,28 @@ def validate(valilist, savedmodel):
         return avgValidLer
 
 
-def mainSingle():
-    inputstring = "A MOVE to stop Mr .Gaitskell from."
-    inputimageName = "ocrdata/a01-000u-s00-00.png"
-    x1, y1, y1len = img2tensor(misc.imread(inputimageName), inputstring)
-    train([[x1, y1, y1len]])
+def mainValid():
+    avgErrlist = []
+    for m in ["model-dev0.13157895.ckpt",
+              "model-dev0.078947365.ckpt",
+              "model-dev0.05263158.ckpt",
+              "model-dev0.02631579.ckpt",
+              "model-dev0.0.ckpt"]:
+        p("===============> using model:::::" + m + " <---------------------------------------")
+        r = validate(dir2finalDataList("moredata/"), "saveddev/" + m)
+        avgErrlist.append(str(r))
+
+    map(p, avgErrlist)
 
 
-traindata = "ocrdata/"
 
 
 def mainf():
+    traindata = "ocrdata/"
     datalist = dir2finalDataList(traindata)
     valilist = dir2finalDataList("validata/")
     train(datalist, valilist)
 
 
-avgErrlist = []
-for m in ["model-dev0.13157895.ckpt",
-          "model-dev0.078947365.ckpt",
-          "model-dev0.05263158.ckpt",
-          "model-dev0.02631579.ckpt",
-          "model-dev0.0.ckpt"]:
-    p("===============> using model:::::" + m + " <---------------------------------------")
-    r = validate(dir2finalDataList("validata/"), "saveddev/" + m)
-    avgErrlist.append(str(r))
-
-map(p, avgErrlist)
+mainf()
 # dir2finalDataList("validata/")
