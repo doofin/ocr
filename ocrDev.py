@@ -16,7 +16,6 @@ import datetime
 import matplotlib.pyplot as plt
 
 
-
 def p(x): print(x)
 
 
@@ -40,9 +39,9 @@ num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  
 
 valiDir = "validata/"
 isValidating = True
-modelLabel = "devC"+str(num_width)
-savedir = "saved" + modelLabel
-
+modelLabel = "devC" + str(num_width)
+savedir = "saved/gru" + str(num_width) + "/"
+statsdir="stats/"
 
 def img2tensor(imgreaded, labelStr, fn):
     p("img2tensor:" + labelStr + ",," + fn)
@@ -110,7 +109,7 @@ def biLstmCtcGraph(is_validating):
             nncell(prob_numHidden[1])
             for prob_numHidden in [[0.5, 400], [0.6, 300], [0.8, 200], [0.8, 200]]
         ])
-        stack = stackValid if is_validating else stackValid
+        stack = stackValid if is_validating else stackTrain
 
         # stack = tf.nn.rnn_cell.MultiRNNCell([
         #     tf.nn.rnn_cell.GRUCell(num_units=prob_numHidden[1])
@@ -143,6 +142,7 @@ def biLstmCtcGraph(is_validating):
         source_y_decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, sink_lenth_x)
 
         ler = tf.reduce_mean(tf.edit_distance(tf.cast(source_y_decoded[0], tf.int32), sink_y))
+        # tf.summary.scalar('ler', ler)
         saver = tf.train.Saver()
         return sink_x, sink_lenth_x, sink_y, source_y_decoded, cost, optimizer, ler, graph, saver
 
@@ -154,15 +154,16 @@ def train(datalist, valilist):
     sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph, saver = biLstmCtcGraph(False)
     minimalLer = 1
     # saver = tf.train.Saver()
+    totalsteps=0
+    os.makedirs(statsdir, exist_ok=True)
     with tf.Session(graph=graph) as sess:
-        # writer = tf.summary.FileWriter("/tmp/tflog", sess.graph)
+
+
+        writer = tf.summary.FileWriter("/tmp/tflog", sess.graph)
         tf.global_variables_initializer().run()
-        # vald = valilist[0]
-        # vald=datalist[0]
         for curr_epoch in range(num_epochs):
-            train_cost = train_ler = 0
+
             ler_accum = 0
-            ler_avg = 1
             start = time.time()
             datalistRandom = datalist
             random.shuffle(datalistRandom)
@@ -174,14 +175,20 @@ def train(datalist, valilist):
 
                 batch_cost, _ = sess.run([cost, optimizer], feed)
                 train_cost = batch_cost * batch_size
-                train_ler = sess.run(ler, feed_dict=feed) * batch_size
+                train_ler = sess.run(ler, feed_dict=feed)
                 ler_accum += train_ler
                 ler_avg = ler_accum / len(datalistRandom)
 
                 train_cost /= num_examples
                 train_ler /= num_examples
-
+                tf.summary.scalar('training_ler', train_ler)
+                mergedSum = tf.summary.merge_all()
+                with open(statsdir+"training.txt", "a") as myfile:
+                    myfile.write(str(train_ler)+'\n')
                 # val_cost, val_ler = sess.run([cost, ler], feed_dict=feed)
+                mergeRunned = sess.run(mergedSum, feed_dict=feed)
+                writer.add_summary(mergeRunned, totalsteps)
+                totalsteps+=1
                 validAccumLer = 0
                 if (idx % 5 == 0):
                     print(str(idx) + '/' + str(lenofdatalist) + " of data")
@@ -189,15 +196,15 @@ def train(datalist, valilist):
                           .format(curr_epoch + 1, num_epochs, train_cost, train_ler, ler_avg, time.time() - start))
 
                     p(starttime + ' ----> ' + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                    valilistInuse = valilist[:5]
+                    valilistInuse = valilist[:7]
                     validAvgLer = 0
                     for aValid in valilistInuse:
                         feed2 = {sink_x: aValid[0],
                                  sink_lenth_x: aValid[1],
                                  sink_y: aValid[2]
                                  }
-                        result_sparse = sess.run(decoded[0], feed_dict=feed2)
-                        _, lerValid = sess.run([cost, ler], feed_dict=feed2)
+                        # result_sparse = sess.run(decoded[0], feed_dict=feed2)
+                        lerValid, result_sparse = sess.run([ler, decoded[0]], feed_dict=feed2)
 
                         print('Original:\n%s' % joinStr([characterListInUsage[i] for i in sparse2dense(aValid[2])]))
                         print('Decoded:\n%s' % joinStr([characterListInUsage[i]
@@ -208,13 +215,15 @@ def train(datalist, valilist):
                         validAccumLer += lerValid
                         avgValidLer = validAccumLer / len(valilistInuse)
                         validAvgLer = avgValidLer
-
+                    with open(statsdir+"valid.txt", "a") as myfile:
+                        myfile.write(str(avgValidLer) + '\n')
                     p('------avg ler:' + str(avgValidLer) + '-------')
                     if (validAvgLer < minimalLer):
                         minimalLer = lerValid
-                        if (lerValid < 0.7):
+                        if (lerValid < 1):
                             p("saving model....,avg ler:" + str(validAvgLer) + ",, minimal : " + str(minimalLer))
-                            saver.save(sess, savedir + "/model-" + modelLabel+"-" + str(lerValid) + ".ckpt")
+                            os.makedirs(savedir, exist_ok=True)
+                            saver.save(sess, savedir + str(lerValid) + ".ckpt")
 
                     validAccumLer = 0
                     validAvgLer = 0
@@ -270,19 +279,19 @@ def validate(valilist, savedmodel):
         saver.restore(sess, savedmodel)
         minimalLer = 1
         validAvgLerAccum = 0
-        nth=0
-        lenv=len(valilist)
+        nth = 0
+        lenv = len(valilist)
         for aValid in valilist:
             result_sparse, lerValid = sess.run([decoded[0], ler], feed_dict={sink_x: aValid[0],
                                                                              sink_lenth_x: aValid[1],
                                                                              sink_y: aValid[2]})
-            p(str(nth)+" th"+"total: "+str(lenv))
+            p(str(nth) + " th" + "total: " + str(lenv))
             print('Original:\n%s' % joinStr([characterListInUsage[i] for i in sparse2dense(aValid[2])]))
             print('Decoded:\n%s' % joinStr([characterListInUsage[i]
                                             if (i < len(characterListInUsage))
                                             else characterListInUsage[len(characterListInUsage) - 1]
                                             for i in sparse2dense(result_sparse)]))
-            nth+=1
+            nth += 1
             validAvgLerAccum += lerValid
             avgValidLer = validAvgLerAccum / nth
 
@@ -300,8 +309,6 @@ def mainValid():
         avgErrlist.append(str(r))
 
     map(p, avgErrlist)
-
-
 
 
 def mainf():
