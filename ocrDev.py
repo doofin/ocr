@@ -77,6 +77,9 @@ def img2tensor(imgreaded, labelStr, fn):
     return normalizedImgNdarr, [normalizedImgNdarr.shape[1]], sparse_tuple_from([label_dense])
 
 
+def nncell(hu):
+    return tf.nn.rnn_cell.GRUCell(num_units=hu)
+
 def biLstmCtcGraph(is_validating):
     num_hidden = 200
     initial_learning_rate = 1e-4
@@ -86,20 +89,7 @@ def biLstmCtcGraph(is_validating):
         sink_x = tf.placeholder(tf.float32, [None, None, num_width])  # num feature is input length?
         sink_lenth_x = tf.placeholder(tf.int32, [None])
         sink_y = tf.sparse_placeholder(tf.int32)  # targets
-
-        #
-        # cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-        # stack = tf.contrib.rnn.MultiRNNCell([
-        #     tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)] ,state_is_tuple=True)
-
-        # stack = tf.contrib.rnn.MultiRNNCell([
-        #     tf.contrib.rnn.GRUCell(num_hidden)
-        #     for _ in [1, 1, 1, 1, 1]])
-        # tf.nn.rnn_cell.GRUCell(num_hidden)
-        # cellInUse=tf.nn.rnn_cell.LSTMCell(num_units=prob_numHidden[1], use_peepholes=True) if is_validating else
-        def nncell(hu):
-            return tf.nn.rnn_cell.GRUCell(num_units=hu)
-
+        # with tf.name_scope('rnn-cell'):
         stackTrain = tf.nn.rnn_cell.MultiRNNCell([
             tf.nn.rnn_cell.DropoutWrapper(cell=nncell(prob_numHidden[1]),
                                           output_keep_prob=prob_numHidden[0])
@@ -109,57 +99,30 @@ def biLstmCtcGraph(is_validating):
             nncell(prob_numHidden[1])
             for prob_numHidden in [[0.5, 400], [0.6, 300], [0.8, 200], [0.8, 200]]
         ])
-        stack = stackValid if is_validating else stackTrain
-
-        # stack = tf.nn.rnn_cell.MultiRNNCell([
-        #     tf.nn.rnn_cell.GRUCell(num_units=prob_numHidden[1])
-        #     for prob_numHidden in [[0.5, 500], [0.5, 400], [0.6, 300], [0.8, 200], [0.9, 200]]
-        # ])  #
-
-        # stack=tf.contrib.rnn.GRUCell(num_hidden)
-
+        stack = stackValid if is_validating else stackValid
         outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
-
-        # frnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-        # brnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-
-        # frnn = tf.contrib.rnn.GRUCell(num_hidden)
-        # brnn = tf.contrib.rnn.GRUCell(num_hidden)
-        # outputs, _ = tf.nn.bidirectional_dynamic_rnn(frnn, brnn, sink_x, sink_lenth_x, dtype=tf.float32)
-
         sink_x_shape = tf.shape(sink_x)
         batch_s, max_timesteps = sink_x_shape[0], sink_x_shape[1]
-        outputs = tf.reshape(outputs, [-1, num_hidden])
-
+        outputs_reshaped = tf.reshape(outputs, [-1, num_hidden])
         W = tf.Variable(tf.truncated_normal([num_hidden, num_classes], stddev=0.2))
         b = tf.Variable(tf.constant(0.1, shape=[num_classes]))
-        logits = tf.transpose(tf.reshape(tf.matmul(outputs, W) + b, [batch_s, -1, num_classes]), (1, 0, 2))
-
+        logits = tf.transpose(tf.reshape(tf.matmul(outputs_reshaped, W) + b, [batch_s, -1, num_classes]), (1, 0, 2))
         cost = tf.reduce_mean(tf.nn.ctc_loss(sink_y, logits, sink_lenth_x))
-        # optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
         optimizer = tf.train.AdamOptimizer(initial_learning_rate, 0.9).minimize(cost)
-        # decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sink_lenth_x)
         source_y_decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, sink_lenth_x)
-
         ler = tf.reduce_mean(tf.edit_distance(tf.cast(source_y_decoded[0], tf.int32), sink_y))
-        # tf.summary.scalar('ler', ler)
         saver = tf.train.Saver()
         return sink_x, sink_lenth_x, sink_y, source_y_decoded, cost, optimizer, ler, graph, saver
 
-
 def train(datalist, valilist):
     num_epochs = 500
-    batch_size = 1
-    num_examples = 1
     sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph, saver = biLstmCtcGraph(False)
     minimalLer = 1
-    # saver = tf.train.Saver()
     totalsteps=0
     os.makedirs(statsdir, exist_ok=True)
     with tf.Session(graph=graph) as sess:
-
-
         writer = tf.summary.FileWriter("/tmp/tflog", sess.graph)
+        tf.summary.scalar('train-ler', ler)
         tf.global_variables_initializer().run()
         for curr_epoch in range(num_epochs):
 
@@ -173,20 +136,13 @@ def train(datalist, valilist):
                         sink_lenth_x: datalistRandom[1],
                         sink_y: datalistRandom[2]}
 
-                batch_cost, _ = sess.run([cost, optimizer], feed)
-                train_cost = batch_cost * batch_size
-                train_ler = sess.run(ler, feed_dict=feed)
+                merged = tf.summary.merge_all()
+                train_cost, _ ,train_ler,mergeRunned = sess.run([cost, optimizer,ler,merged], feed)
                 ler_accum += train_ler
                 ler_avg = ler_accum / len(datalistRandom)
-
-                train_cost /= num_examples
-                train_ler /= num_examples
-                tf.summary.scalar('training_ler', train_ler)
-                mergedSum = tf.summary.merge_all()
                 with open(statsdir+"training.txt", "a") as myfile:
                     myfile.write(str(train_ler)+'\n')
-                # val_cost, val_ler = sess.run([cost, ler], feed_dict=feed)
-                mergeRunned = sess.run(mergedSum, feed_dict=feed)
+                p("nth total : ---------: "+str(totalsteps))
                 writer.add_summary(mergeRunned, totalsteps)
                 totalsteps+=1
                 validAccumLer = 0
@@ -196,14 +152,13 @@ def train(datalist, valilist):
                           .format(curr_epoch + 1, num_epochs, train_cost, train_ler, ler_avg, time.time() - start))
 
                     p(starttime + ' ----> ' + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                    valilistInuse = valilist[:7]
+                    valilistInuse = valilist[:5]
                     validAvgLer = 0
                     for aValid in valilistInuse:
                         feed2 = {sink_x: aValid[0],
                                  sink_lenth_x: aValid[1],
                                  sink_y: aValid[2]
                                  }
-                        # result_sparse = sess.run(decoded[0], feed_dict=feed2)
                         lerValid, result_sparse = sess.run([ler, decoded[0]], feed_dict=feed2)
 
                         print('Original:\n%s' % joinStr([characterListInUsage[i] for i in sparse2dense(aValid[2])]))
@@ -225,11 +180,7 @@ def train(datalist, valilist):
                             os.makedirs(savedir, exist_ok=True)
                             saver.save(sess, savedir + str(lerValid) + ".ckpt")
 
-                    validAccumLer = 0
-                    validAvgLer = 0
                     p("\n")
-    # writer.close()
-
 
 import os
 
@@ -320,3 +271,10 @@ def mainf():
 mainf()
 # mainValid()
 # dir2finalDataList("validata/")
+
+# frnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
+# brnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
+
+# frnn = tf.contrib.rnn.GRUCell(num_hidden)
+# brnn = tf.contrib.rnn.GRUCell(num_hidden)
+# outputs, _ = tf.nn.bidirectional_dynamic_rnn(frnn, brnn, sink_x, sink_lenth_x, dtype=tf.float32)
