@@ -93,11 +93,11 @@ def biLstmCtcGraph(is_validating):
         stackTrain = tf.nn.rnn_cell.MultiRNNCell([
             tf.nn.rnn_cell.DropoutWrapper(cell=nncell(prob_numHidden[1]),
                                           output_keep_prob=prob_numHidden[0])
-            for prob_numHidden in [[0.6, 400], [0.7, 300], [0.8, 200], [0.9, 200]]
+            for prob_numHidden in [[0.6, 300], [0.7, 300], [0.8, 200], [0.9, 200]]
         ])
         stackValid = tf.nn.rnn_cell.MultiRNNCell([
             nncell(prob_numHidden[1])
-            for prob_numHidden in [[0.5, 400], [0.6, 300], [0.8, 200], [0.8, 200]]
+            for prob_numHidden in [[0.5, 300], [0.6, 300], [0.8, 200], [0.8, 200]]
         ])
         stack = stackValid if is_validating else stackValid
         outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
@@ -140,8 +140,8 @@ def train(datalist, valilist):
                 train_cost, _ ,train_ler,mergeRunned = sess.run([cost, optimizer,ler,merged], feed)
                 ler_accum += train_ler
                 ler_avg = ler_accum / len(datalistRandom)
-                with open(statsdir+"training.txt", "a") as myfile:
-                    myfile.write(str(train_ler)+'\n')
+                # with open(statsdir+"training.txt", "a") as myfile:
+                #     myfile.write(str(train_ler)+'\n')
                 p("nth total : ---------: "+str(totalsteps))
                 writer.add_summary(mergeRunned, totalsteps)
                 totalsteps+=1
@@ -170,8 +170,8 @@ def train(datalist, valilist):
                         validAccumLer += lerValid
                         avgValidLer = validAccumLer / len(valilistInuse)
                         validAvgLer = avgValidLer
-                    with open(statsdir+"valid.txt", "a") as myfile:
-                        myfile.write(str(avgValidLer) + '\n')
+                    # with open(statsdir+"valid.txt", "a") as myfile:
+                    #     myfile.write(str(avgValidLer) + '\n')
                     p('------avg ler:' + str(avgValidLer) + '-------')
                     if (validAvgLer < minimalLer):
                         minimalLer = lerValid
