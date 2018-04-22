@@ -34,7 +34,7 @@ characterBasic = string.ascii_lowercase + " " + string.digits
 characterExtra = ".,\n|" + string.punctuation
 characterListInUsage = characterBasic
 characterListForDecoding = characterListInUsage + characterExtra
-num_width = 32  # bigger -> worse! 50 feature?
+num_width = 40  # bigger -> worse! 50 feature?
 num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
 
 valiDir = "validata/"
@@ -121,7 +121,7 @@ def train(datalist, valilist):
     totalsteps=0
     os.makedirs(statsdir, exist_ok=True)
     with tf.Session(graph=graph) as sess:
-        writer = tf.summary.FileWriter("/tmp/tflog", graph=None)
+        writer = tf.summary.FileWriter("/var/tmp/tflog", graph=None)
         tf.summary.scalar('train-ler', ler)
         tf.global_variables_initializer().run()
         for curr_epoch in range(num_epochs):
