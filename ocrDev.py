@@ -121,7 +121,7 @@ def train(datalist, valilist):
     totalsteps=0
     os.makedirs(statsdir, exist_ok=True)
     with tf.Session(graph=graph) as sess:
-        writer = tf.summary.FileWriter("/tmp/tflog", sess.graph)
+        writer = tf.summary.FileWriter("/tmp/tflog", graph=None)
         tf.summary.scalar('train-ler', ler)
         tf.global_variables_initializer().run()
         for curr_epoch in range(num_epochs):
