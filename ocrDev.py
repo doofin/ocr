@@ -14,7 +14,7 @@ import random
 import cv2
 import datetime
 import matplotlib.pyplot as plt
-
+import os
 
 def p(x): print(x)
 
@@ -95,23 +95,23 @@ def biLstmCtcGraph(is_validating):
         stackTrain = tf.nn.rnn_cell.MultiRNNCell([
             tf.nn.rnn_cell.DropoutWrapper(cell=nncell(prob_numHidden[1]),
                                           output_keep_prob=prob_numHidden[0])
-            for prob_numHidden in [[0.6, 300], [0.7, 300], [0.8, 200], [0.9, 200]]
+            for prob_numHidden in [[0.6, 300], [0.6, 300], [0.6, 200], [0.6, 200]]
         ])
         stackValid = tf.nn.rnn_cell.MultiRNNCell([
             nncell(prob_numHidden[1])
-            for prob_numHidden in [[0.5, 300], [0.6, 300], [0.8, 200], [0.8, 200]]
+            for prob_numHidden in [[0.6, 300], [0.6, 300], [0.6, 200], [0.6, 200]]
         ])
-        stack = stackValid if is_validating else stackValid
+        stack = stackValid if is_validating else stackTrain
         outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
         sink_x_shape = tf.shape(sink_x)
-        batch_s, max_timesteps = sink_x_shape[0], sink_x_shape[1]
+        batch_s, _ = sink_x_shape[0], sink_x_shape[1]
         outputs_reshaped = tf.reshape(outputs, [-1, num_hidden])
         W = tf.Variable(tf.truncated_normal([num_hidden, num_classes], stddev=0.2))
         b = tf.Variable(tf.constant(0.1, shape=[num_classes]))
         logits = tf.transpose(tf.reshape(tf.matmul(outputs_reshaped, W) + b, [batch_s, -1, num_classes]), (1, 0, 2))
         cost = tf.reduce_mean(tf.nn.ctc_loss(sink_y, logits, sink_lenth_x))
         optimizer = tf.train.AdamOptimizer(initial_learning_rate, 0.9).minimize(cost)
-        source_y_decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, sink_lenth_x)
+        source_y_decoded, _ = tf.nn.ctc_beam_search_decoder(logits, sink_lenth_x)
         ler = tf.reduce_mean(tf.edit_distance(tf.cast(source_y_decoded[0], tf.int32), sink_y))
         saver = tf.train.Saver()
         return sink_x, sink_lenth_x, sink_y, source_y_decoded, cost, optimizer, ler, graph, saver
@@ -122,7 +122,7 @@ def current_milli_time(): return int(round(time.time() * 1000))
 
 def train(datalist, valilist):
     num_epochs = 500
-    sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph, saver = biLstmCtcGraph(False)
+    sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph, saver = biLstmCtcGraph(is_validating=False)
     minimalLer = 1
     totalsteps = 0
     os.makedirs(statsdir, exist_ok=True)
@@ -130,46 +130,31 @@ def train(datalist, valilist):
     trainfile = open(statsdir + "train.txt", "w")
 
     with tf.Session(graph=graph) as sess:
-        # writer = tf.summary.FileWriter("/var/tmp/tflog", graph=None)
-        # tf.summary.scalar('train-ler', ler)
         tf.global_variables_initializer().run()
         for curr_epoch in range(num_epochs):
-
             ler_accum = 0
-            start = time.time()
-            datalistRandom = datalist
-            random.shuffle(datalistRandom)
-            lenofdatalist = len(datalist)
-            for idx, datalistRandom in enumerate(datalistRandom):
-                feed = {sink_x: datalistRandom[0],
-                        sink_lenth_x: datalistRandom[1],
-                        sink_y: datalistRandom[2]}
-
-                # merged = tf.summary.merge_all()
+            startTime = time.time()
+            lenOfDatalist = len(datalist)
+            for idx, a_data in enumerate(datalist):
+                feed = {sink_x: a_data[0],sink_lenth_x: a_data[1],sink_y: a_data[2]}
                 train_cost, _, train_ler = sess.run([cost, optimizer, ler], feed)
                 ler_accum += train_ler
-                ler_avg = ler_accum / len(datalistRandom)
-                # with open(statsdir+"training.txt", "a") as myfile:
-                #     myfile.write(str(train_ler)+'\n')
+                ler_avg = ler_accum / len(a_data)
                 p("nth total : ---------: " + str(totalsteps))
-                trainfile.write(str(totalsteps) + ',' + str(current_milli_time()) + ',' + str(train_ler)+'\n')
+                trainfile.write(str(totalsteps) + ',' + str(current_milli_time()) + ',' + str(train_ler) + '\n')
                 trainfile.flush()
-                # writer.add_summary(mergeRunned, totalsteps)
                 totalsteps += 1
                 validAccumLer = 0
                 if (idx % 5 == 0):
-                    print(str(idx) + '/' + str(lenofdatalist) + " of data")
+                    print(str(idx) + '/' + str(lenOfDatalist) + " of data")
                     print("Epoch {}/{},train_cost {:.3f}, train_ler {:.3f}, accumLer {:.3f},time = {:.3f}"
-                          .format(curr_epoch + 1, num_epochs, train_cost, train_ler, ler_avg, time.time() - start))
+                          .format(curr_epoch + 1, num_epochs, train_cost, train_ler, ler_avg, time.time() - startTime))
 
                     p(starttime + ' ----> ' + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                     valilistInuse = valilist[:5]
                     validAvgLer = 0
                     for aValid in valilistInuse:
-                        feed2 = {sink_x: aValid[0],
-                                 sink_lenth_x: aValid[1],
-                                 sink_y: aValid[2]
-                                 }
+                        feed2 = {sink_x: aValid[0], sink_lenth_x: aValid[1], sink_y: aValid[2]}
                         lerValid, result_sparse = sess.run([ler, decoded[0]], feed_dict=feed2)
                         print('Original:\n%s' % joinStr([characterListInUsage[i] for i in sparse2dense(aValid[2])]))
                         print('Decoded:\n%s' % joinStr([characterListInUsage[i]
@@ -178,30 +163,20 @@ def train(datalist, valilist):
                                                         for i in sparse2dense(result_sparse)]))
                         p('ler : ' + str(lerValid) + ',minimal:' + str(minimalLer))
                         validAccumLer += lerValid
-                        avgValidLer = validAccumLer / len(valilistInuse)
-                        validAvgLer = avgValidLer
-                    # with open(statsdir+"valid.txt", "a") as myfile:
-                    #     myfile.write(str(avgValidLer) + '\n')
-                    validfile.write(str(totalsteps) + ',' + str(current_milli_time()) + ',' + str(avgValidLer) + '\n')
+                        validAvgLer = validAccumLer / len(valilistInuse)
+                    validfile.write(str(totalsteps) + ',' + str(current_milli_time()) + ',' + str(validAvgLer) + '\n')
                     validfile.flush()
-                    p('------avg ler:' + str(avgValidLer) + '-------')
+                    p('------avg ler:' + str(validAvgLer) + '-------')
                     if (validAvgLer < minimalLer):
-                        minimalLer = lerValid
-                        if (lerValid < 1):
+                        minimalLer = validAvgLer
+                        if (validAvgLer < 0.6):
                             p("saving model....,avg ler:" + str(validAvgLer) + ",, minimal : " + str(minimalLer))
                             os.makedirs(savedir, exist_ok=True)
-                            saver.save(sess, savedir + str(lerValid) + ".ckpt")
-
+                            saver.save(sess, savedir + str(validAvgLer) + ".ckpt")
                     p("\n")
 
-
-import os
-
-labelFileName = "sentences.txt"
-
-
-def labelFile2list(imageFN):
-    labFile = open(labelFileName, 'r')
+def getLabelList():
+    labFile = open("sentences.txt", 'r')
     return [line.replace('\n', '').split(' ') for line in labFile.readlines()]
 
 
@@ -213,7 +188,7 @@ def dir2finalDataList(imgDir):
     p("reading...")
     imgNameAndLabel = []  # [(imgname,label)]
     ct = 0
-    labelfilelist = labelFile2list(labelFileName)
+    labelfilelist = getLabelList()
     for x in list(map(lambda adir: adir.split('.')[0], os.listdir(imgDir))):
         foundLabel_line = imageFilename2label(labelfilelist, x)
         if foundLabel_line[2] == 'ok':
@@ -223,9 +198,7 @@ def dir2finalDataList(imgDir):
             imgNameAndLabel.append([x + ".png", cleaned_label])
             ct += 1
 
-    # p(imgNameAndLabel)
     p("read complete")
-    # medianBlur
     finalfeedable = [[x[0], x[1], x[2]] for x in
                      [img2tensor(
                          cv2.imread(imgDir + y[0], 0),
@@ -239,16 +212,14 @@ def dir2finalDataList(imgDir):
 def validate(valilist, savedmodel):
     sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph, saver = biLstmCtcGraph(True)
     with tf.Session(graph=graph) as sess:
-        # tf.global_variables_initializer().run()
         saver.restore(sess, savedmodel)
         minimalLer = 1
         validAvgLerAccum = 0
         nth = 0
         lenv = len(valilist)
         for aValid in valilist:
-            result_sparse, lerValid = sess.run([decoded[0], ler], feed_dict={sink_x: aValid[0],
-                                                                             sink_lenth_x: aValid[1],
-                                                                             sink_y: aValid[2]})
+            result_sparse, lerValid = \
+                sess.run([decoded[0], ler], feed_dict={sink_x: aValid[0],sink_lenth_x: aValid[1],sink_y: aValid[2]})
             p(str(nth) + " th" + "total: " + str(lenv))
             print('Original:\n%s' % joinStr([characterListInUsage[i] for i in sparse2dense(aValid[2])]))
             print('Decoded:\n%s' % joinStr([characterListInUsage[i]
