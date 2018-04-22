@@ -41,7 +41,8 @@ valiDir = "validata/"
 isValidating = True
 modelLabel = "devC" + str(num_width)
 savedir = "saved/gru" + str(num_width) + "/"
-statsdir="stats/"
+statsdir = "stats/"
+
 
 def img2tensor(imgreaded, labelStr, fn):
     p("img2tensor:" + labelStr + ",," + fn)
@@ -80,6 +81,7 @@ def img2tensor(imgreaded, labelStr, fn):
 def nncell(hu):
     return tf.nn.rnn_cell.GRUCell(num_units=hu)
 
+
 def biLstmCtcGraph(is_validating):
     num_hidden = 200
     initial_learning_rate = 1e-4
@@ -114,15 +116,19 @@ def biLstmCtcGraph(is_validating):
         saver = tf.train.Saver()
         return sink_x, sink_lenth_x, sink_y, source_y_decoded, cost, optimizer, ler, graph, saver
 
+current_milli_time = lambda: int(round(time.time() * 1000))
 def train(datalist, valilist):
     num_epochs = 500
     sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph, saver = biLstmCtcGraph(False)
     minimalLer = 1
-    totalsteps=0
+    totalsteps = 0
     os.makedirs(statsdir, exist_ok=True)
+    validfile = open(statsdir + "valid.txt", "w")
+    trainfile = open(statsdir + "train.txt", "w")
+
     with tf.Session(graph=graph) as sess:
-        writer = tf.summary.FileWriter("/var/tmp/tflog", graph=None)
-        tf.summary.scalar('train-ler', ler)
+        # writer = tf.summary.FileWriter("/var/tmp/tflog", graph=None)
+        # tf.summary.scalar('train-ler', ler)
         tf.global_variables_initializer().run()
         for curr_epoch in range(num_epochs):
 
@@ -136,15 +142,16 @@ def train(datalist, valilist):
                         sink_lenth_x: datalistRandom[1],
                         sink_y: datalistRandom[2]}
 
-                merged = tf.summary.merge_all()
-                train_cost, _ ,train_ler,mergeRunned = sess.run([cost, optimizer,ler,merged], feed)
+                # merged = tf.summary.merge_all()
+                train_cost, _, train_ler= sess.run([cost, optimizer, ler], feed)
                 ler_accum += train_ler
                 ler_avg = ler_accum / len(datalistRandom)
                 # with open(statsdir+"training.txt", "a") as myfile:
                 #     myfile.write(str(train_ler)+'\n')
-                p("nth total : ---------: "+str(totalsteps))
-                writer.add_summary(mergeRunned, totalsteps)
-                totalsteps+=1
+                p("nth total : ---------: " + str(totalsteps))
+                trainfile.write(str(totalsteps)+','+ str(current_milli_time)+','+str(train_ler))
+                # writer.add_summary(mergeRunned, totalsteps)
+                totalsteps += 1
                 validAccumLer = 0
                 if (idx % 5 == 0):
                     print(str(idx) + '/' + str(lenofdatalist) + " of data")
@@ -160,7 +167,7 @@ def train(datalist, valilist):
                                  sink_y: aValid[2]
                                  }
                         lerValid, result_sparse = sess.run([ler, decoded[0]], feed_dict=feed2)
-
+                        validfile.write(str(totalsteps) + ',' + str(current_milli_time) + ',' + str(lerValid))
                         print('Original:\n%s' % joinStr([characterListInUsage[i] for i in sparse2dense(aValid[2])]))
                         print('Decoded:\n%s' % joinStr([characterListInUsage[i]
                                                         if (i < len(characterListInUsage))
@@ -181,6 +188,7 @@ def train(datalist, valilist):
                             saver.save(sess, savedir + str(lerValid) + ".ckpt")
 
                     p("\n")
+
 
 import os
 
