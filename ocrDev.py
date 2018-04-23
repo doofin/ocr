@@ -16,6 +16,7 @@ import datetime
 import matplotlib.pyplot as plt
 import os
 
+
 def p(x): print(x)
 
 
@@ -34,13 +35,14 @@ characterBasic = string.ascii_lowercase + " " + string.digits
 characterExtra = ".,\n|" + string.punctuation
 characterListInUsage = characterBasic
 characterListForDecoding = characterListInUsage + characterExtra
-num_width = 42  # bigger -> worse! 50 feature?
+num_width = 34  # bigger -> worse! 50 feature?
+num_firstLayer = 400
 num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
 
 valiDir = "validata/"
 isValidating = True
 modelLabel = "devC" + str(num_width)
-savedir = "saved/gru" + str(num_width) + "/"
+savedir = "saved/gru" + str(num_width) + "-" + str(num_firstLayer) + "/"
 statsdir = "stats/"
 
 
@@ -95,11 +97,11 @@ def biLstmCtcGraph(is_validating):
         stackTrain = tf.nn.rnn_cell.MultiRNNCell([
             tf.nn.rnn_cell.DropoutWrapper(cell=nncell(prob_numHidden[1]),
                                           output_keep_prob=prob_numHidden[0])
-            for prob_numHidden in [[0.6, 300], [0.6, 300], [0.6, 200], [0.6, 200]]
+            for prob_numHidden in [[0.6, num_firstLayer], [0.6, 300], [0.7, 200], [0.8, 200]]
         ])
         stackValid = tf.nn.rnn_cell.MultiRNNCell([
             nncell(prob_numHidden[1])
-            for prob_numHidden in [[0.6, 300], [0.6, 300], [0.6, 200], [0.6, 200]]
+            for prob_numHidden in [[0.6, num_firstLayer], [0.6, 300], [0.6, 200], [0.6, 200]]
         ])
         stack = stackValid if is_validating else stackTrain
         outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
@@ -136,7 +138,7 @@ def train(datalist, valilist):
             startTime = time.time()
             lenOfDatalist = len(datalist)
             for idx, a_data in enumerate(datalist):
-                feed = {sink_x: a_data[0],sink_lenth_x: a_data[1],sink_y: a_data[2]}
+                feed = {sink_x: a_data[0], sink_lenth_x: a_data[1], sink_y: a_data[2]}
                 train_cost, _, train_ler = sess.run([cost, optimizer, ler], feed)
                 ler_accum += train_ler
                 ler_avg = ler_accum / len(a_data)
@@ -174,6 +176,7 @@ def train(datalist, valilist):
                             os.makedirs(savedir, exist_ok=True)
                             saver.save(sess, savedir + str(validAvgLer) + ".ckpt")
                     p("\n")
+
 
 def getLabelList():
     labFile = open("sentences.txt", 'r')
@@ -219,7 +222,7 @@ def validate(valilist, savedmodel):
         lenv = len(valilist)
         for aValid in valilist:
             result_sparse, lerValid = \
-                sess.run([decoded[0], ler], feed_dict={sink_x: aValid[0],sink_lenth_x: aValid[1],sink_y: aValid[2]})
+                sess.run([decoded[0], ler], feed_dict={sink_x: aValid[0], sink_lenth_x: aValid[1], sink_y: aValid[2]})
             p(str(nth) + " th" + "total: " + str(lenv))
             print('Original:\n%s' % joinStr([characterListInUsage[i] for i in sparse2dense(aValid[2])]))
             print('Decoded:\n%s' % joinStr([characterListInUsage[i]
