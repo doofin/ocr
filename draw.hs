@@ -35,7 +35,7 @@ chartH  = fromIntegral $ windowH
 chartM  = 50
 
 q x y  = translate dx dy
-    where dx = (-(fromIntegral windowW / 2)) + (chartM + x * (chartW + chartM))
+    where dx = (-(fromIntegral windowW / 2)) + (chartM + x * (chartW + chartM)) + 60
           dy = (fromIntegral windowH / 2) - chartH - chartM - (y * (chartH + chartM))
 
 bgColor      = makeColor 0.98 0.98 0.98 1
@@ -55,66 +55,19 @@ readlogs = do
 --  print txt
   let psed = ps txt
   print psed
-  
-mychart pairs =
-    pictures [ color bgColor $ plotChartBackground xAxis yAxis
-             , plotAxes xAxis yAxis
-             , color pointColor $ plotAxisScales xAxis yAxis (1, 10)
-             , color pointColor $ plotLineChart xAxis yAxis pairs
-             ]
-    where (xs,ys) = unzip pairs
-          xAxis     = fixedScaleAxis Linear chartW 0 $ maximum xs
-          yAxis     = let maxy = maximum ys in trace (show maxy) fixedScaleAxis Linear chartH 0 $ maxy
-
 
 mychart2 pairs = 
     pictures [ color bgColor $ plotChartBackground xAxis yAxis
-             , color gridColor $ plotGrid xAxis yAxis (0, 0.125)
+             , color gridColor $ plotGrid xAxis yAxis (100, 0.1)
              , plotAxes xAxis yAxis
-             , plotAxisScales xAxis yAxis (2, 0.5)
-             , line 1 pointColor
-             , line 1.5 pointColor'
-             , line 3 pointColor''
+             , plotAxisScalesSZ 0.2 xAxis yAxis (500, 0.2)
+             , line  pointColor
+             , line  pointColor'
+             , line  pointColor''
              ]
     where xAxis     = autoScaleAxis Linear chartW xs
-          yAxis     = fixedScaleAxis Linear chartH 0 10
+          yAxis     = fixedScaleAxis Log chartH 0.1 3
           (xs,ys)        = unzip pairs
-          pts x     = pairs
-          line x c  = color c $ plotLineChart xAxis yAxis (pts x)
-          sigmoid x = 1.0 / (1 + exp (-x))
+          line c  = color c $ plotLineChart xAxis yAxis pairs
+
           
-lineChart :: Picture
-lineChart = 
-    pictures [ color bgColor $ plotChartBackground xAxis yAxis
-             , color gridColor $ plotGrid xAxis yAxis (0, 0.125)
-             , plotAxes xAxis yAxis
-             , plotAxisScales xAxis yAxis (2, 0.5)
-             , line 1 pointColor
-             , line 1.5 pointColor'
-             , line 3 pointColor''
-             ]
-    where xAxis     = autoScaleAxis Linear chartW xs
-          yAxis     = fixedScaleAxis Linear chartH 0 1
-          xs        = [-6,-5.75..6]
-          ys        = [sigmoid x | x <- xs]
-          pts x     = zip xs (map ((+(0.5 - sigmoid 0 / x)) . (/x)) ys)
-          line x c  = color c $ plotLineChart xAxis yAxis (pts x)
-          sigmoid x = 1.0 / (1 + exp (-x))
-          
-          
------------------------------------------------------------------------------
-logScaleChart :: Picture
-logScaleChart =
-    pictures [ color bgColor $ plotChartBackground xAxis yAxis
-             , plotAxes xAxis yAxis
-             , color pointColor $ plotAxisScales xAxis yAxis (1, 10)
-             , translate (chartW + 25) 0 $ color pointColor' 
-                                         $ plotAxisScales xAxis yAxis' (0, 10)
-             , color pointColor $ plotLineChart xAxis yAxis $ zip xs ys
-             , color pointColor' $ plotLineChart xAxis yAxis' $ zip xs ys
-             ]
-    where xAxis     = fixedScaleAxis Linear chartW 0 10
-          yAxis     = fixedScaleAxis Linear chartH 0 1024
-          yAxis'    = fixedScaleAxis Log chartH 1 1000
-          xs        = [0.1, 0.25..10]
-          ys        = map (2 **) xs
