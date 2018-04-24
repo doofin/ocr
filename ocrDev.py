@@ -35,7 +35,7 @@ characterBasic = string.ascii_lowercase + " " + string.digits
 characterExtra = ".,\n|" + string.punctuation
 characterListInUsage = characterBasic
 characterListForDecoding = characterListInUsage + characterExtra
-num_width = 34  # bigger -> worse! 50 feature?
+num_width = 36  # bigger -> worse! 50 feature?
 num_firstLayer = 400
 num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
 
@@ -97,7 +97,7 @@ def biLstmCtcGraph(is_validating):
         stackTrain = tf.nn.rnn_cell.MultiRNNCell([
             tf.nn.rnn_cell.DropoutWrapper(cell=nncell(prob_numHidden[1]),
                                           output_keep_prob=prob_numHidden[0])
-            for prob_numHidden in [[0.6, num_firstLayer], [0.6, 300], [0.7, 200], [0.8, 200]]
+            for prob_numHidden in [[0.8, num_firstLayer], [0.8, 300], [0.9, 200], [0.9, 200]]
         ])
         stackValid = tf.nn.rnn_cell.MultiRNNCell([
             nncell(prob_numHidden[1])
@@ -241,9 +241,9 @@ def validate(valilist, savedmodel):
 
 def mainValid():
     avgErrlist = []
-    for m in ["model-dev0.23404256.ckpt"]:
+    for m in ["0.31876641511917114.ckpt"]:
         p("===============> using model:::::" + m + " <---------------------------------------")
-        r = validate(dir2finalDataList("ocrdata/"), "saveddev/" + m)
+        r = validate(dir2finalDataList("validata/"), "saved/gru34-400/" + m)
         avgErrlist.append(str(r))
 
     map(p, avgErrlist)
