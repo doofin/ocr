@@ -35,14 +35,14 @@ characterBasic = string.ascii_lowercase + " " + string.digits
 characterExtra = ".,\n|" + string.punctuation
 characterListInUsage = characterBasic
 characterListForDecoding = characterListInUsage + characterExtra
-num_width = 36  # bigger -> worse! 50 feature?
+num_width = 26  # bigger -> worse! 50 feature?
 num_firstLayer = 400
 num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
 
 valiDir = "validata/"
 isValidating = True
 modelLabel = "devC" + str(num_width)
-savedir = "saved/gru" + str(num_width) + "-" + str(num_firstLayer) + "/"
+savedir = "saved/gru4l" + str(num_width) + "-" + str(num_firstLayer) + "/"
 statsdir = "stats/"
 
 
@@ -80,8 +80,7 @@ def img2tensor(imgreaded, labelStr, fn):
     return normalizedImgNdarr, [normalizedImgNdarr.shape[1]], sparse_tuple_from([label_dense])
 
 
-def nncell(hu):
-    return tf.nn.rnn_cell.GRUCell(num_units=hu)
+def nncell(hu): return tf.nn.rnn_cell.GRUCell(num_units=hu)
 
 
 def biLstmCtcGraph(is_validating):
@@ -97,18 +96,18 @@ def biLstmCtcGraph(is_validating):
         stackTrain = tf.nn.rnn_cell.MultiRNNCell([
             tf.nn.rnn_cell.DropoutWrapper(cell=nncell(prob_numHidden[1]),
                                           output_keep_prob=prob_numHidden[0])
-            for prob_numHidden in [[0.8, num_firstLayer], [0.8, 300], [0.9, 200], [0.9, 200]]
+            for prob_numHidden in [[0.6, num_firstLayer], [0.7, 300], [0.8, 200], [0.9, 200]]
         ])
         stackValid = tf.nn.rnn_cell.MultiRNNCell([
             nncell(prob_numHidden[1])
-            for prob_numHidden in [[0.6, num_firstLayer], [0.6, 300], [0.6, 200], [0.6, 200]]
+            for prob_numHidden in [[1, num_firstLayer], [1, 300], [1, 200], [1, 200]]
         ])
         stack = stackValid if is_validating else stackTrain
         outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
         sink_x_shape = tf.shape(sink_x)
-        batch_s, _ = sink_x_shape[0], sink_x_shape[1]
+        batch_s = sink_x_shape[0]
         outputs_reshaped = tf.reshape(outputs, [-1, num_hidden])
-        W = tf.Variable(tf.truncated_normal([num_hidden, num_classes], stddev=0.2))
+        W = tf.Variable(tf.truncated_normal([num_hidden, num_classes]))  # stddev=0.2
         b = tf.Variable(tf.constant(0.1, shape=[num_classes]))
         logits = tf.transpose(tf.reshape(tf.matmul(outputs_reshaped, W) + b, [batch_s, -1, num_classes]), (1, 0, 2))
         cost = tf.reduce_mean(tf.nn.ctc_loss(sink_y, logits, sink_lenth_x))

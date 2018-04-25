@@ -58,9 +58,9 @@ readlogs = do
 
 mychart2 pairs = 
     pictures [ color bgColor $ plotChartBackground xAxis yAxis
-             , color gridColor $ plotGrid xAxis yAxis (500, 0.1)
+             , color gridColor $ plotGrid xAxis yAxis (1000, 0.1)
              , plotAxes xAxis yAxis
-             , plotAxisScalesSZ 0.2 xAxis yAxis (1000, 0.2)
+             , plotAxisScalesSZ 0.2 xAxis yAxis (3000, 0.2)
              , line  pointColor
              , line  pointColor'
              , line  pointColor''
