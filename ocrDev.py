@@ -35,7 +35,7 @@ characterBasic = string.ascii_lowercase + " " + string.digits
 characterExtra = ".,\n|" + string.punctuation
 characterListInUsage = characterBasic
 characterListForDecoding = characterListInUsage + characterExtra
-num_width = 26  # bigger -> worse! 50 feature?
+num_width = 20  # bigger -> worse! 50 feature?
 num_firstLayer = 400
 num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
 
