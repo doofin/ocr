@@ -35,7 +35,7 @@ characterBasic = string.ascii_lowercase + " " + string.digits
 characterExtra = ".,\n|" + string.punctuation
 characterListInUsage = characterBasic
 characterListForDecoding = characterListInUsage + characterExtra
-num_width = 20  # bigger -> worse! 50 feature?
+num_width = 24  # bigger -> worse! 50 feature?
 num_firstLayer = 400
 num_classes = len(characterListInUsage) + 1 + 1  # Accounting the 0th indice +  space + blank label = 28 characters
 
@@ -96,11 +96,11 @@ def biLstmCtcGraph(is_validating):
         stackTrain = tf.nn.rnn_cell.MultiRNNCell([
             tf.nn.rnn_cell.DropoutWrapper(cell=nncell(prob_numHidden[1]),
                                           output_keep_prob=prob_numHidden[0])
-            for prob_numHidden in [[0.6, num_firstLayer], [0.7, 300], [0.8, 200], [0.9, 200]]
+            for prob_numHidden in [[0.6, num_firstLayer], [0.7, 300], [0.7, 300], [0.8, 200], [0.8, 200], [0.9, 200]]
         ])
         stackValid = tf.nn.rnn_cell.MultiRNNCell([
             nncell(prob_numHidden[1])
-            for prob_numHidden in [[1, num_firstLayer], [1, 300], [1, 200], [1, 200]]
+            for prob_numHidden in [[0.6, num_firstLayer], [0.7, 300], [0.7, 300], [0.8, 200], [0.8, 200], [0.9, 200]]
         ])
         stack = stackValid if is_validating else stackTrain
         outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
