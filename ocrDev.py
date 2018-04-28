@@ -44,6 +44,8 @@ isValidating = True
 modelLabel = "devC" + str(num_width)
 savedir = "saved/gru4l" + str(num_width) + "-" + str(num_firstLayer) + "/"
 statsdir = "stats/"
+shape1, shape1name = [[0.6, num_firstLayer], [0.7, 300], [0.8, 200], [0.9, 200]], "sdfsdfsdf"
+shape2 = [[0.6, num_firstLayer], [0.7, 300], [0.7, 300], [0.8, 200], [0.8, 200], [0.9, 200]]
 
 
 def img2tensor(imgreaded, labelStr, fn):
@@ -92,15 +94,14 @@ def biLstmCtcGraph(is_validating):
         sink_x = tf.placeholder(tf.float32, [None, None, num_width])  # num feature is input length?
         sink_lenth_x = tf.placeholder(tf.int32, [None])
         sink_y = tf.sparse_placeholder(tf.int32)  # targets
-        # with tf.name_scope('rnn-cell'):
         stackTrain = tf.nn.rnn_cell.MultiRNNCell([
             tf.nn.rnn_cell.DropoutWrapper(cell=nncell(prob_numHidden[1]),
                                           output_keep_prob=prob_numHidden[0])
-            for prob_numHidden in [[0.6, num_firstLayer], [0.7, 300], [0.7, 300], [0.8, 200], [0.8, 200], [0.9, 200]]
+            for prob_numHidden in shape1
         ])
         stackValid = tf.nn.rnn_cell.MultiRNNCell([
             nncell(prob_numHidden[1])
-            for prob_numHidden in [[0.6, num_firstLayer], [0.7, 300], [0.7, 300], [0.8, 200], [0.8, 200], [0.9, 200]]
+            for prob_numHidden in shape1
         ])
         stack = stackValid if is_validating else stackTrain
         outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)

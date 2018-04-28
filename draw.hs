@@ -7,11 +7,17 @@ import Text.Parsec.Combinator
 import Text.Parsec.Char
 import Text.Parsec.Token
 import Debug.Trace
+import Text.Parsec.String
+
+
 ps str = case (parse tpps "" (str :: String)) of
   Left err  -> trace (show err) []
   Right xs  -> xs
 
+tpps::Parser [[Float]]
 tpps = lne `endBy` (char '\n')
+
+lne::Parser [Float]
 lne = (fmap (read :: String->Float) (many (digit <|> char '.'))) `sepBy` (char ',' )
 
  
@@ -25,8 +31,12 @@ main = do
     pairst <-ps2 "stats/train.txt"
     let disp = InWindow "HsCharts Demo" (windowW, windowH) (0, 0)
     display disp white $ pictures [
-      q 0 0 $ mychart2 pairsv,
-      q 1 0 $ mychart2 pairst]
+      q 0 0 $ mychartLin pairsv,
+      q 1 0 $ mychartLin pairst,
+      q 2 0 $ mychartLog pairsv,
+      q 3 0 $ mychartLog pairst
+
+      ]
     
 windowW = 1800
 windowH = 1000
@@ -56,7 +66,21 @@ readlogs = do
   let psed = ps txt
   print psed
 
-mychart2 pairs = 
+mychartLin pairs = 
+    pictures [ color bgColor $ plotChartBackground xAxis yAxis
+             , color gridColor $ plotGrid xAxis yAxis (1000, 0.1)
+             , plotAxes xAxis yAxis
+             , plotAxisScalesSZ 0.2 xAxis yAxis (3000, 0.2)
+             , line  pointColor
+             , line  pointColor'
+             , line  pointColor''
+             ]
+    where xAxis     = autoScaleAxis Linear chartW xs
+          yAxis     = fixedScaleAxis Linear chartH 0 3
+          (xs,ys)        = unzip pairs
+          line c  = color c $ plotLineChart xAxis yAxis pairs
+          
+mychartLog pairs = 
     pictures [ color bgColor $ plotChartBackground xAxis yAxis
              , color gridColor $ plotGrid xAxis yAxis (1000, 0.1)
              , plotAxes xAxis yAxis
