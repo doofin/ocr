@@ -43,7 +43,7 @@ windowH = 1000
 chartW  = fromIntegral $  windowW 
 chartH  = fromIntegral $ windowH 
 chartM  = 50
-
+drawInterval=10000
 q x y  = translate dx dy
     where dx = (-(fromIntegral windowW / 2)) + (chartM + x * (chartW + chartM)) + 60
           dy = (fromIntegral windowH / 2) - chartH - chartM - (y * (chartH + chartM))
@@ -70,7 +70,7 @@ mychartLin pairs =
     pictures [ color bgColor $ plotChartBackground xAxis yAxis
              , color gridColor $ plotGrid xAxis yAxis (1000, 0.1)
              , plotAxes xAxis yAxis
-             , plotAxisScalesSZ 0.2 xAxis yAxis (3000, 0.2)
+             , plotAxisScalesSZ 0.2 xAxis yAxis (drawInterval, 0.2)
              , line  pointColor
              , line  pointColor'
              , line  pointColor''
@@ -84,7 +84,7 @@ mychartLog pairs =
     pictures [ color bgColor $ plotChartBackground xAxis yAxis
              , color gridColor $ plotGrid xAxis yAxis (1000, 0.1)
              , plotAxes xAxis yAxis
-             , plotAxisScalesSZ 0.2 xAxis yAxis (3000, 0.2)
+             , plotAxisScalesSZ 0.2 xAxis yAxis (drawInterval, 0.2)
              , line  pointColor
              , line  pointColor'
              , line  pointColor''
