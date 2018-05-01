@@ -45,7 +45,7 @@ chartH  = fromIntegral $ windowH
 chartM  = 50
 drawInterval=10000
 q x y  = translate dx dy
-    where dx = (-(fromIntegral windowW / 2)) + (chartM + x * (chartW + chartM)) + 60
+    where dx = (-(fromIntegral windowW / 2)) + (chartM + x * (chartW + chartM)) + 200
           dy = (fromIntegral windowH / 2) - chartH - chartM - (y * (chartH + chartM))
 
 bgColor      = makeColor 0.98 0.98 0.98 1
