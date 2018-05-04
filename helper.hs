@@ -26,4 +26,4 @@ lne = (fmap (read :: String->Float) (many (digit <|> char '.'))) `sepBy` (char '
 biniarize = system "convert pp2.png -threshold 40% thres_colored2.png"
 concatPdf = system "pdfunite grad/front.pdf thesisnew.pdf o.pdf" 
  
-main = undefined
+main = concatPdf
