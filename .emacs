@@ -15,12 +15,18 @@
 (keybd "<M-right>" 'sp-forward-sexp)
 (keybd "<M-left>" 'sp-backward-sexp)
 (keybd "C-o" 'other-window)
-
+(keybd "C-f" 'isearch-forward)
+(keybd "C-<next>" 'next-buffer)
+(keybd "C-<prior>" 'previous-buffer)
+(keybd "C-o" 'popup-imenu)
+(global-set-key (kbd "C-p") 'insert-parentheses)
+(global-set-key (kbd "M-1") 'neotree-toggle)
 (global-set-key "\C-s" 'save-buffer)
 (global-set-key (kbd "C-x j") 'delete-indentation)
 (global-set-key "\C-v" 'yank)
-;;(global-set-key "\C-c" 'kill-ring-save)
 (global-set-key "\C-z" 'undo)
+(define-key isearch-mode-map "\C-f" 'isearch-repeat-forward)
+;;(global-set-key "\C-c" 'kill-ring-save)
 
 (setq backup-directory-alist `(("." . "~/emacs_autosave")))
 
@@ -35,10 +41,11 @@
 
 (setq package-check-signature nil)
 (add-to-list 'load-path "~/.emacs.d/lisp/")
-(add-to-list 'load-path "~/.cabal/share/x86_64-linux-ghc-8.0.2/HaRe-0.8.4.0/elisp")
+(add-to-list 'load-path "~/.cabal/share/x86_64-linux-ghc-8.0.2/HaRe-0.8.4.1/elisp")
 (package-initialize)
 
 (require 'company)
+(require 'rainbow-delimiters)
 (add-hook 'after-init-hook 'global-company-mode)
 
 
@@ -77,56 +84,40 @@
  '(inhibit-startup-screen t))
 
 
-(add-hook 'haskell-mode-hook 'haskell-indentation-mode)
-(add-hook 'haskell-mode-hook 'interactive-haskell-mode)
-(add-hook 'haskell-mode-hook 'turn-on-haskell-indentation)
-
-
-
-
-
 (let ((my-cabal-path (expand-file-name "~/.cabal/bin")))
   (setenv "PATH" (concat my-cabal-path ":" (getenv "PATH")))
   (add-to-list 'exec-path my-cabal-path))
-
-;(autoload 'ghc-init "ghc" nil t)
-;(autoload 'ghc-debug "ghc" nil t)
-(add-hook 'haskell-mode-hook (lambda () (ghc-init)))
-
-
 (add-to-list 'company-backends 'company-ghc)
 
-;(require 'hare)
-;(autoload 'hare-init "hare" nil t)
-;(add-hook 'haskell-mode-hook (lambda () (ghc-init) (hare-init)))
 
-(require 'rainbow-delimiters)
+(require 'hare)
+(autoload 'hare-init "hare" nil t)
 
-
-;(add-hook 'prog-mode-hook #'rainbow-delimiters-mode)
-
-;(setq enable-local-variables nil)
-;;(turn-on-haskell-indentation)
-
-
-(eval-after-load 'haskell-mode '(progn
-				  (haskell-session-change)
-  ))
-
-(add-hook 'haskell-mode-hook '(lambda () (progn
-					   (define-key haskell-mode-map (kbd "C-l") 'haskell-process-load-or-reload)
-					   (define-key haskell-mode-map (kbd "<f3>") 'haskell-mode-jump-to-def)
-					   (keybd "<f2>" 'ghc-show-info)
-					   (keybd "C-t" 'ghc-show-info)
-					   (message "evaled!") 
-					      )))
+(add-hook 'haskell-mode-hook (lambda () (progn
+					  (ghc-init)
+					  (hare-init)
+					  (keybd "C-r" 'hare-refactor-rename)
+					  (define-key haskell-mode-map (kbd "C-l") 'haskell-process-load-or-reload)
+					  (define-key haskell-mode-map (kbd "<f3>") 'haskell-mode-jump-to-def)
+					  (keybd "<f2>" 'ghc-show-info)
+					  (keybd "C-t" 'ghc-show-info)
+					  (haskell-indentation-mode)
+					  (interactive-haskell-mode)
+					  (turn-on-haskell-indentation)
+					  (global-flycheck-mode)
+					  (eval-after-load 'flycheck '(require 'flycheck-hdevtools))
+					  (eval-after-load 'haskell-mode '(progn
+									    (haskell-session-change)
+									    ))
+					  (message "hs evaled!") 
+					  )))
 
 
-;(global-flycheck-mode)
-;(eval-after-load 'flycheck '(require 'flycheck-hdevtools))
+
+
 
 ;; (load-file (let ((coding-system-for-read 'utf-8)) (shell-command-to-string "agda-mode locate")))
-(tool-bar-mode -1)
+
 
 ;(require 'helm-config)
 ;(helm-mode 1)
@@ -136,11 +127,6 @@
 
 ;; replace the `completion-at-point' and `complete-symbol' bindings in
 ;; irony-mode's buffers by irony-mode's function
-(defun my-irony-mode-hook ()
-  (define-key irony-mode-map [remap completion-at-point]
-    'irony-completion-at-point-async)
-  (define-key irony-mode-map [remap complete-symbol]
-    'irony-completion-at-point-async))
 ;(add-hook 'irony-mode-hook 'my-irony-mode-hook)
 ;(add-hook 'irony-mode-hook 'irony-cdb-autosetup-compile-options)
 
@@ -177,37 +163,35 @@
  ;;             ))
  ;;       ;; Use opam switch to lookup ocamlmerlin binary
  ;;       (setq merlin-command 'opam)))
-(keybd "C-x r" 'hare-refactor-rename)
-(global-set-key (kbd "C-f") 'isearch-forward)
-(define-key isearch-mode-map "\C-f" 'isearch-repeat-forward)
 
-
-(global-set-key (kbd "C-p") 'insert-parentheses)
 
 
 
 (use-package ensime
   :ensure t
   :pin melpa-stable)
-(setq ensime-startup-notification 'nil)
-(setq ensime-eldoc-hints 'all)
-(keybd "C-<next>" 'next-buffer)
-(keybd "C-<prior>" 'previous-buffer)
-(keybd "C-o" 'popup-imenu)
 
 (add-hook 'ensime-mode-hook '(lambda () (progn
+					  (setq ensime-startup-notification 'nil)
+					  (setq ensime-eldoc-hints 'all)
+					  (git-gutter-mode)
 					  (keybd "<f2>" 'ensime-type-at-point)
 					  (keybd "<C-t>" 'ensime-type-at-point)
 					  (keybd "<f3>" 'ensime-goto-source-location)
 					  (keybd "C-x f" 'ensime-format-source)
 					  (keybd "C-r" 'ensime-refactor-diff-rename)
-					  (keybd "M-<Enter>" 'ensime-refactor-add-type-annotation)
-					  (message "ensime-mode custom key ok!")
+					  (keybd "M-RET" 'ensime-refactor-add-type-annotation)
+					  (message "ensime-mode customization ok!")
 	     )))
 
 (add-hook 'emacs-lisp-mode-hook '(lambda () (progn
-					      (global-set-key (kbd "C-l") 'eval-buffer)
-					      (message "evaled!") 
-					      )))
+					      (global-set-key (kbd "C-l") (lambda () (progn
+										       (interactive)
+										       (eval-buffer)
+										       (message "elisp evaled!")
+										       ))) ;; 'eval-buffer
 
-(global-set-key (kbd "M-1") 'neotree-toggle)
+					      )))
+(message "elisp evaled!")
+
+
