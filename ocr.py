@@ -45,28 +45,15 @@ valiDir = "validata/"
 def img2tensor(imageNdarr_imread, labelStr, fn):
     p("img2tensor:" + labelStr + ",," + fn)
     imgRaw_ = imageNdarr_imread.transpose()
-    # print("raw image")
-    # print(imgRaw_.shape)
     rawW_ = imgRaw_.shape[0]
     rawH_ = imgRaw_.shape[1]
     imgHeight_ = num_features
     imgWidth_ = int(round(rawW_ * (imgHeight_ / rawH_)))
     imgResized = misc.imresize(imgRaw_, (imgWidth_, imgHeight_))
     imgResized = cv2.threshold(imgResized, 210, 255, cv2.THRESH_BINARY)[1]
-    # plt.imshow(imgResized)
-    # plt.show()
-
     transposedImgNdarr = np.asarray(imgResized[np.newaxis, :])
     normalizedImgNdarr = (transposedImgNdarr - np.mean(transposedImgNdarr)) / np.std(transposedImgNdarr)
-    # p(labelStr)
     label_dense = np.asarray([characterListInUsage.index(x) for x in labelStr])
-    # p('normalizedImgNdarr')
-    # p(normalizedImgNdarr.shape)
-
-    # len(normalizedImgNdarr[0][0]) == num features =11
-    # len(normalizedImgNdarr[0]) == img width
-    # p(len(normalizedImgNdarr[0]))
-    # sliceImg(normalizedImgNdarr)
 
     return normalizedImgNdarr, [normalizedImgNdarr.shape[1]], sparse_tuple_from([label_dense])
 
@@ -81,14 +68,6 @@ def biLstmCtcGraph(is_validating):
         sink_lenth_x = tf.placeholder(tf.int32, [None])
         sink_y = tf.sparse_placeholder(tf.int32)  # targets
 
-        # cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-        # stack = tf.contrib.rnn.MultiRNNCell([
-        #     tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)] ,state_is_tuple=True)
-
-        # stack = tf.contrib.rnn.MultiRNNCell([
-        #     tf.contrib.rnn.GRUCell(num_hidden)
-        #     for _ in [1, 1, 1, 1, 1]])
-        # tf.nn.rnn_cell.GRUCell(num_hidden)
         stackTrain = tf.nn.rnn_cell.MultiRNNCell([
             tf.nn.rnn_cell.DropoutWrapper(cell=tf.nn.rnn_cell.LSTMCell(num_units=prob_numHidden[1], use_peepholes=True),
                                           output_keep_prob=prob_numHidden[0])
@@ -100,16 +79,7 @@ def biLstmCtcGraph(is_validating):
         ])
         stack = stackValid if is_validating else stackTrain
 
-        # stack=tf.contrib.rnn.GRUCell(num_hidden)
-
         outputs, _ = tf.nn.dynamic_rnn(stack, sink_x, sink_lenth_x, dtype=tf.float32)
-
-        # frnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-        # brnn=tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-
-        # frnn = tf.contrib.rnn.GRUCell(num_hidden)
-        # brnn = tf.contrib.rnn.GRUCell(num_hidden)
-        # outputs, _ = tf.nn.bidirectional_dynamic_rnn(frnn, brnn, sink_x, sink_lenth_x, dtype=tf.float32)
 
         sink_x_shape = tf.shape(sink_x)
         batch_s, max_timesteps = sink_x_shape[0], sink_x_shape[1]
@@ -136,12 +106,8 @@ def train(datalist, valilist):
     num_examples = 1
     sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph, saver = biLstmCtcGraph()
     minimalLer = 1
-    # saver = tf.train.Saver()
     with tf.Session(graph=graph) as sess:
-        # writer = tf.summary.FileWriter("/tmp/tflog", sess.graph)
         tf.global_variables_initializer().run()
-        # vald = valilist[0]
-        # vald=datalist[0]
         for curr_epoch in range(num_epochs):
             train_cost = train_ler = 0
             ler_accum = 0
@@ -164,7 +130,6 @@ def train(datalist, valilist):
                 train_cost /= num_examples
                 train_ler /= num_examples
 
-                # val_cost, val_ler = sess.run([cost, ler], feed_dict=feed)
                 validAvgLerTotal = 0
                 if (idx % 5 == 0):
                     print(str(idx) + '/' + str(lenofdatalist) + " of data")
@@ -197,13 +162,11 @@ def train(datalist, valilist):
                     p('------avg ler:' + str(avgValidLer) + '-------')
                     validAvgLerTotal = 0
                     p("\n")
-    # writer.close()
 
 
 def validate(valilist):
     sink_x, sink_lenth_x, sink_y, decoded, cost, optimizer, ler, graph, saver = biLstmCtcGraph(True)
     with tf.Session(graph=graph) as sess:
-        # tf.global_variables_initializer().run()
         saver.restore(sess, "saved/model-0.18421052.ckpt")
         minimalLer = 1
         validAvgLerAccum = 0
@@ -292,5 +255,3 @@ def mainValid():
 
 
 mainValid()
-# mainf()
-# dir2finalDataList("validata/")
