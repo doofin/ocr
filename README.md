@@ -1,19 +1,24 @@
-# LSTM + CTC for handwriting recognization
+# LSTM + CTC for handwriting character recognization(graduation thesis for undergraduate,written in Chinese,based on tensorflow)
 
-end to end training,no segmentation into individual alphabets!
+End to end training and recognization of whole sentence,no segmentation of individual alphabets is involved!
 
-big picture : fixed height sentence picture (variable length) -> unrolled lstm by variable length -> ctc loss
+Overview of the architecture : fixed height ,variable length picture of a sentence  -> unrolled dynamic lstm by variable length -> ctc loss
 
 ## result:
 
 ![result](https://raw.githubusercontent.com/doofin/ocr/master/ocrResult.png?token=ABOC6CLFIU7FR4VZLR6J7O27X5T44)
 
+
 ## Requirements
 
 - Python 2.7+
-- Tensorflow 1.0+
+- Tensorflow 1.x
 - numpy
 - scipy
+
+# run
+
+run wordOcr.py  with python , this will train the model and save it.
 
 # data format:
 
@@ -41,4 +46,9 @@ big picture : fixed height sentence picture (variable length) -> unrolled lstm b
     #     A|MOVE|to|stop|Mr.|Gaitskell|from
     #                     -> transcription for this part of the sentence. word
     #                        tokens are separated by the character |
-#
+    
+# files:
+
+thesisnew.pdf : the thesis in Chinese
+.py files : the AI model 
+.hs files : haskell code for visualization
