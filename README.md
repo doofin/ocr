@@ -50,5 +50,7 @@ run wordOcr.py  with python , this will train the model and save it.
 # files:
 
 thesisnew.pdf : the thesis in Chinese
+
 .py files : the AI model 
+
 .hs files : haskell code for visualization
