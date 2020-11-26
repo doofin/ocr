@@ -4,6 +4,9 @@ end to end training,no segmentation into individual alphabets!
 
 big picture : fixed height sentence picture (variable length) -> unrolled lstm by variable length -> ctc loss
 
+## result:
+
+![result](https://raw.githubusercontent.com/doofin/ocr/master/ocrResult.png?token=ABOC6CLFIU7FR4VZLR6J7O27X5T44)
 
 ## Requirements
 
