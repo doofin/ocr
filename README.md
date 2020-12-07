@@ -1,8 +1,10 @@
 # LSTM + CTC for handwriting character recognization(graduation thesis for undergraduate,written in Chinese,based on tensorflow)
 
-End to end training and recognization of whole sentence,no segmentation of individual alphabets is involved!
+End to end training and recognization of whole sentence handwriting character recognization,no process of segmentation into individual alphabets is involved!
 
-Overview of the architecture : fixed height ,variable length picture of a sentence  -> unrolled dynamic lstm by variable length -> ctc loss
+Overview of the architecture : 
+
+fixed height ,variable length image of a sentence  -> unrolled dynamic LSTM by variable length -> CTC(Connectionist temporal classification) loss -> linear layer -> result
 
 ## result:
 
@@ -10,6 +12,7 @@ Overview of the architecture : fixed height ,variable length picture of a senten
 
 
 ## Requirements
+Attention: The archetecture is set up at about 2017 and has become outdated ,it's better to reimplement with the new pytorch framework
 
 - Python 2.7+
 - Tensorflow 1.x
