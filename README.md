@@ -1,17 +1,18 @@
-Undergraduate dissertation for sequence to sequence translation,written in Chinese.
+Undergraduate dissertation about sequence to sequence translation and ocr,written in Chinese.
 
-# abstract 
+# Abstract 
 This dissertation shows an neural model to do sequence to sequence translation,more specifically,it uses LSTM + CTC for handwriting English character recognition.
 It features an end to end structure,that is a whole sentence is processed,so that there is no segmentation of sentence into individual alphabets.
-
-# Overview of the architecture
-
-fixed height ,variable length image of a sentence  -> unrolled dynamic LSTM by variable length -> CTC(Connectionist temporal classification) loss -> linear layer -> result
 
 ## result:
 
 ![result](https://raw.githubusercontent.com/doofin/ocr/master/ocrResult.png?token=ABOC6CLFIU7FR4VZLR6J7O27X5T44)
 
+Look at the original and decoded(result) line,you can see that although the performance is not perfect,it is comparatively feasible giving the obstrusiveness of the handwriting style.
+
+# The architecture of the neural network
+
+fixed height ,variable length image of a sentence  -> unrolled dynamic LSTM by variable length -> CTC(Connectionist temporal classification) loss -> linear layer -> result
 
 ## Requirements
 Attention: The code is written in 2017 and has become outdated .please consider the new pytorch framework for its simplicity of dynamic nets.
